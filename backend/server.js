@@ -11,6 +11,7 @@ import documentRoutes from "./routes/documentRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import flashcardRoutes from "./routes/flashcardRoutes.js";
 import quizRoutes from "./routes/quizRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/flashcards", flashcardRoutes);
 app.use("/api/quizzes", quizRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

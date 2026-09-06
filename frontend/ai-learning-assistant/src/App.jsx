@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./hooks/useAuth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
+import DashboardLayout from "./components/layout/DashboardLayout";
 
 import LoginPage from "./pages/Auth/LoginPage";
 import RegisterPage from "./pages/Auth/RegisterPage";
@@ -54,69 +55,21 @@ const AppRoutes = () => (
     />
 
     <Route
-      path="/dashboard"
       element={
         <ProtectedRoute>
-          <DashboardPage />
+          <DashboardLayout />
         </ProtectedRoute>
       }
-    />
-    <Route
-      path="/documents"
-      element={
-        <ProtectedRoute>
-          <DocumentListPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/documents/:id"
-      element={
-        <ProtectedRoute>
-          <DocumentDetailPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/documents/:id/flashcards"
-      element={
-        <ProtectedRoute>
-          <FlashcardPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/flashcards"
-      element={
-        <ProtectedRoute>
-          <FlashcardsListPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/quizzes/:id"
-      element={
-        <ProtectedRoute>
-          <QuizTakePage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/quizzes/:id/results"
-      element={
-        <ProtectedRoute>
-          <QuizResultPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/profile"
-      element={
-        <ProtectedRoute>
-          <ProfilePage />
-        </ProtectedRoute>
-      }
-    />
+    >
+      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/documents" element={<DocumentListPage />} />
+      <Route path="/documents/:id" element={<DocumentDetailPage />} />
+      <Route path="/documents/:id/flashcards" element={<FlashcardPage />} />
+      <Route path="/flashcards" element={<FlashcardsListPage />} />
+      <Route path="/quizzes/:id" element={<QuizTakePage />} />
+      <Route path="/quizzes/:id/results" element={<QuizResultPage />} />
+      <Route path="/profile" element={<ProfilePage />} />
+    </Route>
 
     <Route path="*" element={<NotFoundPage />} />
   </Routes>

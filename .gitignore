@@ -9,7 +9,8 @@ node_modules/
 .env.local
 
 # Backend
-backend/uploads/
+backend/uploads/*
+!backend/uploads/.gitkeep
 
 # Build output
 dist/

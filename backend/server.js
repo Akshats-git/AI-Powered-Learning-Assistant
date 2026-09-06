@@ -5,8 +5,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
+import { connectDB } from "./config/db.js";
 
 dotenv.config();
+
+connectDB();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();

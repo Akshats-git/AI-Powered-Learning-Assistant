@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import { PDFParse } from "pdf-parse";
 import Document from "../models/Document.js";
+import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 
 const extractText = async (filePath) => {
   const buffer = await fs.readFile(filePath);
@@ -58,11 +59,7 @@ export const listDocuments = async (req, res, next) => {
 
 export const getDocument = async (req, res, next) => {
   try {
-    const document = await Document.findOne({ _id: req.params.id, user: req.user._id });
-    if (!document) {
-      res.status(404);
-      throw new Error("Document not found");
-    }
+    const document = await getOwnedDocument(req.params.id, req.user._id);
 
     document.lastAccessedAt = new Date();
     await document.save();
@@ -75,11 +72,7 @@ export const getDocument = async (req, res, next) => {
 
 export const deleteDocument = async (req, res, next) => {
   try {
-    const document = await Document.findOne({ _id: req.params.id, user: req.user._id });
-    if (!document) {
-      res.status(404);
-      throw new Error("Document not found");
-    }
+    const document = await getOwnedDocument(req.params.id, req.user._id);
 
     await fs.unlink(document.filePath).catch(() => {});
     await document.deleteOne();

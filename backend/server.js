@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 import { connectDB } from "./config/db.js";
+import authRoutes from "./routes/authRoutes.js";
 
 dotenv.config();
 
@@ -21,6 +22,8 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
+
+app.use("/api/auth", authRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

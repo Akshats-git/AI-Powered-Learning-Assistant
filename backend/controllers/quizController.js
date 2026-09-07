@@ -95,6 +95,8 @@ export const getQuizResults = async (req, res, next) => {
     const correct = quiz.questions.filter((q, i) => quiz.userAnswers[i] === q.correctAnswer).length;
 
     res.status(200).json({
+      title: quiz.title,
+      document: quiz.document,
       total,
       correct,
       incorrect: total - correct,

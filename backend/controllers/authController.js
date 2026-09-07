@@ -71,7 +71,7 @@ export const updatePassword = async (req, res, next) => {
     const user = await User.findById(req.user._id);
 
     if (!(await user.comparePassword(currentPassword))) {
-      res.status(401);
+      res.status(400);
       throw new Error("Current password is incorrect");
     }
 

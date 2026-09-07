@@ -1,5 +1,75 @@
-import PagePlaceholder from "../../components/ui/PagePlaceholder";
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
-const DocumentDetailPage = () => <PagePlaceholder title="Document Detail" />;
+import { getDocument } from "../../services/documentService";
+import ContentTab from "../../components/documents/tabs/ContentTab";
+import ChatTab from "../../components/documents/tabs/ChatTab";
+import AIActionsTab from "../../components/documents/tabs/AIActionsTab";
+import FlashcardsTab from "../../components/documents/tabs/FlashcardsTab";
+import QuizzesTab from "../../components/documents/tabs/QuizzesTab";
+
+const TABS = [
+  { key: "content", label: "Content" },
+  { key: "chat", label: "Chat" },
+  { key: "ai-actions", label: "AI Actions" },
+  { key: "flashcards", label: "Flashcards" },
+  { key: "quizzes", label: "Quizzes" },
+];
+
+const DocumentDetailPage = () => {
+  const { id } = useParams();
+  const [document, setDocument] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("content");
+
+  useEffect(() => {
+    setLoading(true);
+    getDocument(id)
+      .then((res) => setDocument(res.data))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return <div className="h-40 bg-white rounded-xl border border-gray-100 animate-pulse" />;
+  }
+
+  if (!document) {
+    return <p className="text-sm text-gray-500">Document not found.</p>;
+  }
+
+  return (
+    <div>
+      <Link to="/documents" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-4">
+        <ArrowLeft className="w-4 h-4" />
+        Back to Documents
+      </Link>
+
+      <h1 className="text-2xl font-bold text-gray-900 mb-4 truncate">{document.title}</h1>
+
+      <div className="flex gap-6 border-b border-gray-200 mb-6 overflow-x-auto">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`pb-3 text-sm font-medium border-b-2 whitespace-nowrap transition ${
+              activeTab === tab.key
+                ? "border-primary text-primary-dark"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "content" && <ContentTab document={document} />}
+      {activeTab === "chat" && <ChatTab documentId={document._id} />}
+      {activeTab === "ai-actions" && <AIActionsTab documentId={document._id} />}
+      {activeTab === "flashcards" && <FlashcardsTab documentId={document._id} />}
+      {activeTab === "quizzes" && <QuizzesTab documentId={document._id} />}
+    </div>
+  );
+};
 
 export default DocumentDetailPage;

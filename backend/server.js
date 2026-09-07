@@ -31,7 +31,14 @@ app.use(
 app.use(compression());
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.removeHeader("X-Frame-Options");
+    next();
+  },
+  express.static(path.join(__dirname, "uploads"))
+);
 
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });

@@ -1,20 +1,21 @@
 # AI-Powered Learning Assistant
 
-Upload a PDF, read it in-app, and turn it into AI chat, summaries, concept
-explanations, flashcards, and quizzes — with progress tracking. A MERN stack
-app (MongoDB, Express, React, Node) with an LLM layer for the AI features.
+Upload a PDF and read it in the app. Turn it into AI chat, summaries, concept
+explanations, flashcards and quizzes. Track your progress as you go. This is
+a MERN stack app (MongoDB, Express, React, Node) with an LLM layer for the AI
+features.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ## Features
 
-- **Auth** — JWT-based register/login, protected routes, password change
-- **Documents** — drag-and-drop PDF upload (10MB limit), text extraction, in-app viewer
-- **AI Chat** — ask questions about a document, with markdown + code-highlighted replies
-- **AI Actions** — one-click summaries and on-demand concept explanations
-- **Flashcards** — AI-generated sets, flip-card viewer with keyboard navigation, per-card review tracking and progress bars
-- **Quizzes** — AI-generated multiple-choice quizzes, server-side grading, detailed results with explanations
-- **Dashboard** — document/flashcard/quiz counts and recent activity at a glance
+- **Auth**: JWT based register and login, protected routes, password change
+- **Documents**: drag and drop PDF upload (10MB limit), text extraction, in-app viewer
+- **AI Chat**: ask questions about a document and get markdown replies with code highlighting
+- **AI Actions**: one-click summaries and on-demand concept explanations
+- **Flashcards**: AI-generated sets with a flip-card viewer, keyboard navigation, per-card review tracking and progress bars
+- **Quizzes**: AI-generated multiple-choice quizzes with server-side grading and detailed results
+- **Dashboard**: document, flashcard and quiz counts plus recent activity
 
 ## Tech stack
 
@@ -26,9 +27,9 @@ react-syntax-highlighter.
 multer (uploads), pdf-parse (text extraction), the OpenAI API for AI
 generation, helmet + compression + express-rate-limit for hardening.
 
-> The original plan targeted Google Gemini; this build uses the OpenAI API
+> The original plan targeted Google Gemini. This build uses the OpenAI API
 > instead. The AI layer (`backend/utils/aiClient.js`) is a single thin
-> wrapper, so swapping providers again only means changing that one file.
+> wrapper. Swapping providers again only means changing that one file.
 
 ## Screenshots
 
@@ -119,9 +120,9 @@ Then open `http://localhost:5173`, register an account, and upload a PDF.
 
 ## Notes
 
-- AI routes are rate-limited (30 requests / 15 min per user) and guarded
-  against documents with no extractable text (e.g. scanned PDFs).
-- Quiz answer keys are never sent to the client until a quiz is submitted —
-  grading happens server-side.
-- Uploaded files are stored on local disk under `backend/uploads/`; for a
-  production deploy with an ephemeral filesystem, swap in S3/Cloudinary.
+- AI routes are rate limited to 30 requests per 15 minutes per user. They
+  also block documents with no extractable text, such as scanned PDFs.
+- Quiz answer keys are never sent to the client until a quiz is submitted.
+  Grading happens on the server.
+- Uploaded files are stored on local disk under `backend/uploads/`. For a
+  production deploy with an ephemeral filesystem, swap in S3 or Cloudinary.

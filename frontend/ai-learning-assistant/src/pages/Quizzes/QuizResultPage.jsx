@@ -7,8 +7,8 @@ import { getQuizResults } from "../../services/quizService";
 const ENCOURAGEMENT = (pct) => {
   if (pct >= 90) return "Outstanding work!";
   if (pct >= 70) return "Great job!";
-  if (pct >= 50) return "Good effort — keep practicing.";
-  return "Don't worry, review the material and try again.";
+  if (pct >= 50) return "Good effort. Keep practicing.";
+  return "Review the material and try again.";
 };
 
 const QuizResultPage = () => {

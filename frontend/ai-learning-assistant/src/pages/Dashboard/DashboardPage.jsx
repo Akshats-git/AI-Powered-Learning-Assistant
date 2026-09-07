@@ -83,7 +83,7 @@ const DashboardPage = () => {
             <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mb-3">
               <Inbox className="w-5 h-5 text-gray-400" />
             </div>
-            <p className="text-sm text-gray-500 mb-3">No activity yet — upload a document to get started.</p>
+            <p className="text-sm text-gray-500 mb-3">No activity yet. Upload a document to get started.</p>
             <Link
               to="/documents"
               className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"

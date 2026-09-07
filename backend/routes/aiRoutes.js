@@ -8,10 +8,12 @@ import {
   getChatHistory,
 } from "../controllers/aiController.js";
 import { protect } from "../middlewares/authMiddleware.js";
+import { aiRateLimiter } from "../middlewares/rateLimiter.js";
 
 const router = express.Router();
 
 router.use(protect);
+router.use(aiRateLimiter);
 
 router.post("/generate-flashcards", generateFlashcards);
 router.post("/generate-quiz", generateQuiz);

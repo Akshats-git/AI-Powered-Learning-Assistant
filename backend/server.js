@@ -3,6 +3,8 @@ import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import compression from "compression";
 
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 import { connectDB } from "./config/db.js";
@@ -20,6 +22,13 @@ connectDB();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+app.use(compression());
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

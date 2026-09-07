@@ -1,6 +1,8 @@
 import fs from "fs/promises";
 import { PDFParse } from "pdf-parse";
 import Document from "../models/Document.js";
+import Flashcard from "../models/Flashcard.js";
+import Quiz from "../models/Quiz.js";
 import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 
 const extractText = async (filePath) => {
@@ -51,7 +53,23 @@ export const uploadDocument = async (req, res, next) => {
 export const listDocuments = async (req, res, next) => {
   try {
     const documents = await Document.find({ user: req.user._id }).sort({ createdAt: -1 });
-    res.status(200).json(documents.map(toDocumentResponse));
+    const docIds = documents.map((d) => d._id);
+
+    const [flashcardCounts, quizCounts] = await Promise.all([
+      Flashcard.aggregate([{ $match: { document: { $in: docIds } } }, { $group: { _id: "$document", count: { $sum: 1 } } }]),
+      Quiz.aggregate([{ $match: { document: { $in: docIds } } }, { $group: { _id: "$document", count: { $sum: 1 } } }]),
+    ]);
+
+    const flashcardMap = new Map(flashcardCounts.map((f) => [f._id.toString(), f.count]));
+    const quizMap = new Map(quizCounts.map((q) => [q._id.toString(), q.count]));
+
+    res.status(200).json(
+      documents.map((doc) => ({
+        ...toDocumentResponse(doc),
+        flashcardCount: flashcardMap.get(doc._id.toString()) || 0,
+        quizCount: quizMap.get(doc._id.toString()) || 0,
+      }))
+    );
   } catch (err) {
     next(err);
   }

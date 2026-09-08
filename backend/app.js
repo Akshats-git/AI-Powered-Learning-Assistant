@@ -1,6 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
+import mongoose from "mongoose";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -38,8 +39,21 @@ app.use(
   express.static(path.join(__dirname, "uploads"))
 );
 
+// Liveness: the process is up and serving requests. A load balancer or
+// orchestrator uses this to decide whether to restart the container — it
+// should stay green even if a downstream dependency is having a bad day.
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
+});
+
+// Readiness: the process is up AND its dependencies are actually reachable.
+// An orchestrator uses this to decide whether to route traffic here.
+app.get("/ready", (req, res) => {
+  const dbReady = mongoose.connection.readyState === 1;
+  res.status(dbReady ? 200 : 503).json({
+    status: dbReady ? "ready" : "not ready",
+    checks: { mongo: dbReady ? "ok" : "unavailable" },
+  });
 });
 
 app.use("/api/auth", authRoutes);

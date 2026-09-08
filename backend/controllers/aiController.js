@@ -4,6 +4,7 @@ import ChatHistory from "../models/ChatHistory.js";
 import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { generate } from "../utils/aiClient.js";
 import { withInFlightGuard } from "../utils/inFlightGuard.js";
+import { assertWithinBudget, recordSpend } from "../utils/aiBudget.js";
 import { flashcardPrompt, quizPrompt, summaryPrompt, explainPrompt, chatPrompt } from "../utils/prompts.js";
 
 const CHAT_CONTEXT_SIZE = 10;
@@ -28,14 +29,20 @@ export const generateFlashcards = async (req, res, next) => {
     const { documentId, count } = req.body;
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
+    await assertWithinBudget(req.user._id);
 
     const cardCount = clampCount(count, 10, 30);
 
     const flashcardSet = await withInFlightGuard(`${req.user._id}:${documentId}:flashcards`, async () => {
+      let costUsd = 0;
       const result = await generate(flashcardPrompt(document.extractedText, cardCount), {
         json: true,
         feature: "flashcards",
+        onUsage: (usage) => {
+          costUsd = usage.costUsd || 0;
+        },
       });
+      await recordSpend(req.user._id, costUsd);
 
       if (!Array.isArray(result.flashcards)) {
         const err = new Error("AI response did not include a flashcards array");
@@ -68,14 +75,20 @@ export const generateQuiz = async (req, res, next) => {
     const { documentId, numQuestions } = req.body;
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
+    await assertWithinBudget(req.user._id);
 
     const questionCount = clampCount(numQuestions, 5, 20);
 
     const quiz = await withInFlightGuard(`${req.user._id}:${documentId}:quiz`, async () => {
+      let costUsd = 0;
       const result = await generate(quizPrompt(document.extractedText, questionCount), {
         json: true,
         feature: "quiz",
+        onUsage: (usage) => {
+          costUsd = usage.costUsd || 0;
+        },
       });
+      await recordSpend(req.user._id, costUsd);
 
       if (!Array.isArray(result.questions)) {
         const err = new Error("AI response did not include a questions array");
@@ -109,10 +122,19 @@ export const generateSummary = async (req, res, next) => {
     const { documentId } = req.body;
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
+    await assertWithinBudget(req.user._id);
 
-    const summary = await withInFlightGuard(`${req.user._id}:${documentId}:summary`, () =>
-      generate(summaryPrompt(document.extractedText), { feature: "summary" })
-    );
+    const summary = await withInFlightGuard(`${req.user._id}:${documentId}:summary`, async () => {
+      let costUsd = 0;
+      const result = await generate(summaryPrompt(document.extractedText), {
+        feature: "summary",
+        onUsage: (usage) => {
+          costUsd = usage.costUsd || 0;
+        },
+      });
+      await recordSpend(req.user._id, costUsd);
+      return result;
+    });
 
     res.status(200).json({ summary });
   } catch (err) {
@@ -130,10 +152,19 @@ export const explainConcept = async (req, res, next) => {
 
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
+    await assertWithinBudget(req.user._id);
 
-    const explanation = await withInFlightGuard(`${req.user._id}:${documentId}:explain:${concept}`, () =>
-      generate(explainPrompt(document.extractedText, concept), { feature: "explain" })
-    );
+    const explanation = await withInFlightGuard(`${req.user._id}:${documentId}:explain:${concept}`, async () => {
+      let costUsd = 0;
+      const result = await generate(explainPrompt(document.extractedText, concept), {
+        feature: "explain",
+        onUsage: (usage) => {
+          costUsd = usage.costUsd || 0;
+        },
+      });
+      await recordSpend(req.user._id, costUsd);
+      return result;
+    });
 
     res.status(200).json({ explanation });
   } catch (err) {
@@ -151,11 +182,19 @@ export const chatWithDocument = async (req, res, next) => {
 
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
+    await assertWithinBudget(req.user._id);
 
     const existingChat = await ChatHistory.findOne({ user: req.user._id, document: document._id });
     const recentHistory = existingChat ? existingChat.messages.slice(-CHAT_CONTEXT_SIZE) : [];
 
-    const reply = await generate(chatPrompt(document.extractedText, recentHistory, message), { feature: "chat" });
+    let costUsd = 0;
+    const reply = await generate(chatPrompt(document.extractedText, recentHistory, message), {
+      feature: "chat",
+      onUsage: (usage) => {
+        costUsd = usage.costUsd || 0;
+      },
+    });
+    await recordSpend(req.user._id, costUsd);
 
     const chat = await ChatHistory.findOneAndUpdate(
       { user: req.user._id, document: document._id },

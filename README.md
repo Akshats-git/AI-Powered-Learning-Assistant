@@ -122,7 +122,11 @@ Then open `http://localhost:5173`, register an account, and upload a PDF.
 
 - AI routes are rate limited to 30 requests per 15 minutes per user. They
   also block documents with no extractable text, such as scanned PDFs.
+- Every AI call is logged with its token usage and an estimated cost, and can
+  be capped per user per month with `MONTHLY_AI_BUDGET_USD` (unset = no cap).
 - Quiz answer keys are never sent to the client until a quiz is submitted.
   Grading happens on the server.
 - Uploaded files are stored on local disk under `backend/uploads/`. For a
   production deploy with an ephemeral filesystem, swap in S3 or Cloudinary.
+- `GET /health` is a liveness check; `GET /ready` also verifies MongoDB is
+  connected — point an orchestrator's readiness probe at the latter.

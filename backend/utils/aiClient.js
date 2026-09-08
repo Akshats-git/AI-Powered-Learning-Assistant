@@ -36,7 +36,7 @@ export const estimateCostUsd = (model, usage) => {
   return Number((inputCost + outputCost).toFixed(6));
 };
 
-export const generate = async (prompt, { json = false, feature = "unknown" } = {}) => {
+export const generate = async (prompt, { json = false, feature = "unknown", onUsage } = {}) => {
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const startedAt = Date.now();
 
@@ -55,6 +55,7 @@ export const generate = async (prompt, { json = false, feature = "unknown" } = {
 
   const content = response.choices[0]?.message?.content || "";
   const usage = response.usage;
+  const costUsd = estimateCostUsd(model, usage);
 
   logger.info(
     {
@@ -63,11 +64,15 @@ export const generate = async (prompt, { json = false, feature = "unknown" } = {
       promptTokens: usage?.prompt_tokens ?? null,
       completionTokens: usage?.completion_tokens ?? null,
       totalTokens: usage?.total_tokens ?? null,
-      estimatedCostUsd: estimateCostUsd(model, usage),
+      estimatedCostUsd: costUsd,
       latencyMs: Date.now() - startedAt,
     },
     "LLM call completed"
   );
+
+  // Lets a caller record spend (e.g. against a per-user budget) without
+  // changing what generate() returns to its many existing callers.
+  if (onUsage) onUsage({ costUsd, usage, model });
 
   if (!json) return content;
 

@@ -121,7 +121,8 @@ describe("cross-user authorization matrix", () => {
   it("excludes another user's documents from the list endpoint", async () => {
     const res = await asIntruder("get", "/api/documents");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+    expect(res.body.items).toEqual([]);
+    expect(res.body.total).toBe(0);
   });
 });
 

@@ -13,16 +13,36 @@ const CardSkeleton = () => (
   </div>
 );
 
+const PAGE_SIZE = 12;
+
 const FlashcardsListPage = () => {
   const navigate = useNavigate();
   const [sets, setSets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    listFlashcardSets()
-      .then((res) => setSets(res.data))
-      .finally(() => setLoading(false));
-  }, []);
+  const fetchSets = (pageNum = 1) => {
+    const isFirstPage = pageNum === 1;
+    if (isFirstPage) setLoading(true);
+    else setLoadingMore(true);
+
+    listFlashcardSets({ page: pageNum, limit: PAGE_SIZE })
+      .then((res) => {
+        setSets((prev) => (isFirstPage ? res.data.items : [...prev, ...res.data.items]));
+        setPage(res.data.page);
+        setTotalPages(res.data.totalPages);
+      })
+      .finally(() => {
+        if (isFirstPage) setLoading(false);
+        else setLoadingMore(false);
+      });
+  };
+
+  // One-time fetch on mount; loading is already true from useState's initial value.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(fetchSets, []);
 
   return (
     <div>
@@ -47,6 +67,7 @@ const FlashcardsListPage = () => {
           </p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {sets.map((set) => (
             <div key={set._id} className="bg-white rounded-xl border border-gray-100 p-5">
@@ -80,6 +101,19 @@ const FlashcardsListPage = () => {
             </div>
           ))}
         </div>
+
+        {page < totalPages && (
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={() => fetchSets(page + 1)}
+              disabled={loadingMore}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-60"
+            >
+              {loadingMore ? "Loading..." : "Load more"}
+            </button>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

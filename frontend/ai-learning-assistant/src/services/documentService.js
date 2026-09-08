@@ -7,7 +7,7 @@ export const uploadDocument = (formData, onUploadProgress) =>
     onUploadProgress,
   });
 
-export const listDocuments = () => axiosInstance.get(API_PATHS.DOCUMENTS.LIST);
+export const listDocuments = (params) => axiosInstance.get(API_PATHS.DOCUMENTS.LIST, { params });
 
 export const getDocument = (id) => axiosInstance.get(API_PATHS.DOCUMENTS.GET(id));
 

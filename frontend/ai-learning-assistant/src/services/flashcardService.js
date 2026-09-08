@@ -1,7 +1,7 @@
 import axiosInstance from "../utils/axiosInstance";
 import { API_PATHS } from "../utils/apiPaths";
 
-export const listFlashcardSets = () => axiosInstance.get(API_PATHS.FLASHCARDS.LIST);
+export const listFlashcardSets = (params) => axiosInstance.get(API_PATHS.FLASHCARDS.LIST, { params });
 
 export const listFlashcardSetsForDocument = (documentId) =>
   axiosInstance.get(API_PATHS.FLASHCARDS.LIST_FOR_DOCUMENT(documentId));

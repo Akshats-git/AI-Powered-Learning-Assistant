@@ -4,6 +4,7 @@ import Document from "../models/Document.js";
 import Flashcard from "../models/Flashcard.js";
 import Quiz from "../models/Quiz.js";
 import { getOwnedDocument } from "../utils/getOwnedDocument.js";
+import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 
 const extractText = async (filePath) => {
   const buffer = await fs.readFile(filePath);
@@ -56,9 +57,16 @@ export const uploadDocument = async (req, res, next) => {
 
 export const listDocuments = async (req, res, next) => {
   try {
-    const documents = await Document.find({ user: req.user._id })
-      .select("-extractedText")
-      .sort({ createdAt: -1 });
+    const { page, limit, skip } = parsePagination(req.query);
+
+    const [documents, total] = await Promise.all([
+      Document.find({ user: req.user._id })
+        .select("-extractedText")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Document.countDocuments({ user: req.user._id }),
+    ]);
     const docIds = documents.map((d) => d._id);
 
     const [flashcardCounts, quizCounts] = await Promise.all([
@@ -69,13 +77,14 @@ export const listDocuments = async (req, res, next) => {
     const flashcardMap = new Map(flashcardCounts.map((f) => [f._id.toString(), f.count]));
     const quizMap = new Map(quizCounts.map((q) => [q._id.toString(), q.count]));
 
-    res.status(200).json(
-      documents.map((doc) => ({
+    res.status(200).json({
+      items: documents.map((doc) => ({
         ...toDocumentResponse(doc),
         flashcardCount: flashcardMap.get(doc._id.toString()) || 0,
         quizCount: quizMap.get(doc._id.toString()) || 0,
-      }))
-    );
+      })),
+      ...buildPageMeta(page, limit, total),
+    });
   } catch (err) {
     next(err);
   }

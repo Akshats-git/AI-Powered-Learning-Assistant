@@ -1,4 +1,5 @@
 import Flashcard from "../models/Flashcard.js";
+import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 
 const withProgress = (set) => {
   const obj = set.toObject();
@@ -24,8 +25,17 @@ const findOwnedSet = async (setId, userId) => {
 
 export const listFlashcardSets = async (req, res, next) => {
   try {
-    const sets = await Flashcard.find({ user: req.user._id }).sort({ createdAt: -1 });
-    res.status(200).json(sets.map(withProgress));
+    const { page, limit, skip } = parsePagination(req.query);
+
+    const [sets, total] = await Promise.all([
+      Flashcard.find({ user: req.user._id }).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Flashcard.countDocuments({ user: req.user._id }),
+    ]);
+
+    res.status(200).json({
+      items: sets.map(withProgress),
+      ...buildPageMeta(page, limit, total),
+    });
   } catch (err) {
     next(err);
   }

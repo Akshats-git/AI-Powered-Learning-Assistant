@@ -13,16 +13,31 @@ const CardSkeleton = () => (
   </div>
 );
 
+const PAGE_SIZE = 12;
+
 const DocumentListPage = () => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [showUpload, setShowUpload] = useState(false);
 
-  const fetchDocuments = () => {
-    setLoading(true);
-    listDocuments()
-      .then((res) => setDocuments(res.data))
-      .finally(() => setLoading(false));
+  const fetchDocuments = (pageNum = 1) => {
+    const isFirstPage = pageNum === 1;
+    if (isFirstPage) setLoading(true);
+    else setLoadingMore(true);
+
+    listDocuments({ page: pageNum, limit: PAGE_SIZE })
+      .then((res) => {
+        setDocuments((prev) => (isFirstPage ? res.data.items : [...prev, ...res.data.items]));
+        setPage(res.data.page);
+        setTotalPages(res.data.totalPages);
+      })
+      .finally(() => {
+        if (isFirstPage) setLoading(false);
+        else setLoadingMore(false);
+      });
   };
 
   // One-time fetch on mount; loading is already true from useState's initial value.
@@ -70,11 +85,25 @@ const DocumentListPage = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {documents.map((doc) => (
-            <DocumentCard key={doc._id} document={doc} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {documents.map((doc) => (
+              <DocumentCard key={doc._id} document={doc} />
+            ))}
+          </div>
+
+          {page < totalPages && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => fetchDocuments(page + 1)}
+                disabled={loadingMore}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onUploaded={handleUploaded} />}

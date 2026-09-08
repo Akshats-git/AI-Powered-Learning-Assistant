@@ -61,6 +61,25 @@ export const submitQuiz = async (req, res, next) => {
 
     const quiz = await findOwnedQuiz(req.params.id, req.user._id);
 
+    if (quiz.isCompleted) {
+      res.status(409);
+      throw new Error("Quiz has already been submitted");
+    }
+
+    if (answers.length !== quiz.questions.length) {
+      res.status(400);
+      throw new Error(`Expected ${quiz.questions.length} answers, got ${answers.length}`);
+    }
+
+    const hasInvalidAnswer = answers.some((answer, i) => {
+      if (answer === null || answer === undefined) return false;
+      return typeof answer !== "string" || !quiz.questions[i].options.includes(answer);
+    });
+    if (hasInvalidAnswer) {
+      res.status(400);
+      throw new Error("One or more answers is not a valid option for its question");
+    }
+
     let correct = 0;
     quiz.questions.forEach((q, i) => {
       if (answers[i] === q.correctAnswer) correct += 1;

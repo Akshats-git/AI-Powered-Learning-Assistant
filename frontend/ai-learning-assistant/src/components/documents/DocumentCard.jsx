@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
-import { FileText, Layers, HelpCircle } from "lucide-react";
+import { FileText, Layers, HelpCircle, AlertTriangle } from "lucide-react";
 import { formatFileSize } from "../../utils/helpers";
 
 const DocumentCard = ({ document }) => {
@@ -29,6 +29,15 @@ const DocumentCard = ({ document }) => {
           <HelpCircle className="w-3 h-3" />
           {document.quizCount ?? 0}
         </span>
+        {document.hasExtractedText === false && (
+          <span
+            title="No extractable text found — AI features are unavailable for this document"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-medium"
+          >
+            <AlertTriangle className="w-3 h-3" />
+            No text
+          </span>
+        )}
       </div>
     </button>
   );

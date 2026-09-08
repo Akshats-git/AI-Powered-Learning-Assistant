@@ -9,6 +9,7 @@ const documentSchema = new mongoose.Schema(
     fileSize: { type: Number, required: true },
     mimeType: { type: String, required: true },
     extractedText: { type: String, default: "" },
+    hasExtractedText: { type: Boolean, default: false },
     lastAccessedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

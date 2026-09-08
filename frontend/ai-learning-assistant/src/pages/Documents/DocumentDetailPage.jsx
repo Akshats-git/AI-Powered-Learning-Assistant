@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 
 import { getDocument } from "../../services/documentService";
 import ContentTab from "../../components/documents/tabs/ContentTab";
@@ -46,6 +46,16 @@ const DocumentDetailPage = () => {
       </Link>
 
       <h1 className="text-2xl font-bold text-gray-900 mb-4 truncate">{document.title}</h1>
+
+      {document.hasExtractedText === false && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 mb-6 text-sm text-amber-800">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>
+            No extractable text was found in this PDF (it's likely scanned or image-based). Chat,
+            summaries, flashcards and quizzes won't work for this document.
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-6 border-b border-gray-200 mb-6 overflow-x-auto">
         {TABS.map((tab) => (

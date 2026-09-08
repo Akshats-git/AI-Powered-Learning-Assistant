@@ -42,6 +42,7 @@ export const uploadDocument = async (req, res, next) => {
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
       extractedText,
+      hasExtractedText: Boolean(extractedText && extractedText.trim()),
     });
 
     res.status(201).json(toDocumentResponse(document));

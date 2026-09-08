@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { logger } from "./logger.js";
 
 let client;
 
@@ -19,20 +20,54 @@ const stripJsonFences = (text) =>
     .replace(/```\s*$/, "")
     .trim();
 
-export const generate = async (prompt, { json = false } = {}) => {
-  let content;
+// Rough, illustrative pricing (USD per 1M tokens) so cost is visible in logs
+// without wiring up a billing API. Update when a model's list price changes,
+// or when a new model is added to OPENAI_MODEL.
+const PRICING_PER_MILLION_TOKENS = {
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4o": { input: 2.5, output: 10 },
+};
+
+export const estimateCostUsd = (model, usage) => {
+  const pricing = PRICING_PER_MILLION_TOKENS[model];
+  if (!pricing || !usage) return null;
+  const inputCost = (usage.prompt_tokens / 1_000_000) * pricing.input;
+  const outputCost = (usage.completion_tokens / 1_000_000) * pricing.output;
+  return Number((inputCost + outputCost).toFixed(6));
+};
+
+export const generate = async (prompt, { json = false, feature = "unknown" } = {}) => {
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const startedAt = Date.now();
+
+  let response;
   try {
-    const response = await getClient().chat.completions.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    response = await getClient().chat.completions.create({
+      model,
       messages: [{ role: "user", content: prompt }],
       ...(json ? { response_format: { type: "json_object" } } : {}),
     });
-    content = response.choices[0]?.message?.content || "";
   } catch (err) {
     const wrapped = new Error(`AI generation failed: ${err.message}`);
     wrapped.statusCode = 502;
     throw wrapped;
   }
+
+  const content = response.choices[0]?.message?.content || "";
+  const usage = response.usage;
+
+  logger.info(
+    {
+      feature,
+      model,
+      promptTokens: usage?.prompt_tokens ?? null,
+      completionTokens: usage?.completion_tokens ?? null,
+      totalTokens: usage?.total_tokens ?? null,
+      estimatedCostUsd: estimateCostUsd(model, usage),
+      latencyMs: Date.now() - startedAt,
+    },
+    "LLM call completed"
+  );
 
   if (!json) return content;
 

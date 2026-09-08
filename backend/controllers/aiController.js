@@ -10,11 +10,7 @@ import { flashcardPrompt, quizPrompt, summaryPrompt, explainPrompt, chatPrompt }
 const CHAT_CONTEXT_SIZE = 10;
 const DIFFICULTIES = ["easy", "medium", "hard"];
 
-const clampCount = (value, fallback, max) => {
-  const n = parseInt(value, 10);
-  if (!Number.isFinite(n) || n < 1) return fallback;
-  return Math.min(n, max);
-};
+const clampCount = (value, fallback, max) => (Number.isFinite(value) ? Math.min(value, max) : fallback);
 
 const assertHasText = (document) => {
   if (!document.extractedText || !document.extractedText.trim()) {
@@ -145,11 +141,6 @@ export const generateSummary = async (req, res, next) => {
 export const explainConcept = async (req, res, next) => {
   try {
     const { documentId, concept } = req.body;
-    if (!concept) {
-      res.status(400);
-      throw new Error("A concept is required");
-    }
-
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
     await assertWithinBudget(req.user._id);
@@ -175,11 +166,6 @@ export const explainConcept = async (req, res, next) => {
 export const chatWithDocument = async (req, res, next) => {
   try {
     const { documentId, message } = req.body;
-    if (!message) {
-      res.status(400);
-      throw new Error("A message is required");
-    }
-
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
     await assertWithinBudget(req.user._id);

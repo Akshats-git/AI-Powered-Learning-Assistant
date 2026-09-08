@@ -7,6 +7,8 @@ import {
 } from "../controllers/documentController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { upload } from "../middlewares/uploadMiddleware.js";
+import { validate } from "../middlewares/validate.js";
+import { idParamsSchema } from "../validators/requestSchema.js";
 
 const router = express.Router();
 
@@ -24,7 +26,7 @@ router.use(protect);
 
 router.post("/upload", uploadSingle, uploadDocument);
 router.get("/", listDocuments);
-router.get("/:id", getDocument);
-router.delete("/:id", deleteDocument);
+router.get("/:id", validate(idParamsSchema("id")), getDocument);
+router.delete("/:id", validate(idParamsSchema("id")), deleteDocument);
 
 export default router;

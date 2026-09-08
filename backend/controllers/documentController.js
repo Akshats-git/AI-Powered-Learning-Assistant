@@ -53,7 +53,9 @@ export const uploadDocument = async (req, res, next) => {
 
 export const listDocuments = async (req, res, next) => {
   try {
-    const documents = await Document.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const documents = await Document.find({ user: req.user._id })
+      .select("-extractedText")
+      .sort({ createdAt: -1 });
     const docIds = documents.map((d) => d._id);
 
     const [flashcardCounts, quizCounts] = await Promise.all([

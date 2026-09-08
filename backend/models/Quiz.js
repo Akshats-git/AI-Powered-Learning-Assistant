@@ -16,7 +16,17 @@ const quizSchema = new mongoose.Schema(
     document: { type: mongoose.Schema.Types.ObjectId, ref: "Document", required: true },
     title: { type: String, required: true, trim: true },
     questions: { type: [questionSchema], default: [] },
-    userAnswers: { type: [String], default: [] },
+    // Keyed by questionId rather than position, so grading doesn't assume the
+    // client echoed answers back in the same order the questions were stored.
+    userAnswers: {
+      type: [
+        {
+          questionId: { type: mongoose.Schema.Types.ObjectId, required: true },
+          answer: { type: String, default: null },
+        },
+      ],
+      default: [],
+    },
     score: { type: Number, default: 0 },
     isCompleted: { type: Boolean, default: false },
     completedAt: { type: Date },

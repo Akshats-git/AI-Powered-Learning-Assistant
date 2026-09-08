@@ -1,4 +1,5 @@
 import Quiz from "../models/Quiz.js";
+import QuizAttempt from "../models/QuizAttempt.js";
 
 const findOwnedQuiz = async (quizId, userId) => {
   const quiz = await Quiz.findOne({ _id: quizId, user: userId });
@@ -54,11 +55,6 @@ export const getQuiz = async (req, res, next) => {
 export const submitQuiz = async (req, res, next) => {
   try {
     const { answers } = req.body;
-    if (!Array.isArray(answers)) {
-      res.status(400);
-      throw new Error("answers must be an array");
-    }
-
     const quiz = await findOwnedQuiz(req.params.id, req.user._id);
 
     if (quiz.isCompleted) {
@@ -66,14 +62,18 @@ export const submitQuiz = async (req, res, next) => {
       throw new Error("Quiz has already been submitted");
     }
 
-    if (answers.length !== quiz.questions.length) {
+    const hasUnknownQuestion = answers.some((a) => !quiz.questions.id(a.questionId));
+    if (hasUnknownQuestion) {
       res.status(400);
-      throw new Error(`Expected ${quiz.questions.length} answers, got ${answers.length}`);
+      throw new Error("One or more answers reference a question that isn't on this quiz");
     }
 
-    const hasInvalidAnswer = answers.some((answer, i) => {
+    const answerByQuestionId = new Map(answers.map((a) => [a.questionId, a.answer ?? null]));
+
+    const hasInvalidAnswer = quiz.questions.some((q) => {
+      const answer = answerByQuestionId.get(q._id.toString());
       if (answer === null || answer === undefined) return false;
-      return typeof answer !== "string" || !quiz.questions[i].options.includes(answer);
+      return !q.options.includes(answer);
     });
     if (hasInvalidAnswer) {
       res.status(400);
@@ -81,18 +81,30 @@ export const submitQuiz = async (req, res, next) => {
     }
 
     let correct = 0;
-    quiz.questions.forEach((q, i) => {
-      if (answers[i] === q.correctAnswer) correct += 1;
+    const userAnswers = quiz.questions.map((q) => {
+      const answer = answerByQuestionId.get(q._id.toString()) ?? null;
+      if (answer === q.correctAnswer) correct += 1;
+      return { questionId: q._id, answer };
     });
 
     const total = quiz.questions.length;
     const score = total ? Math.round((correct / total) * 100) : 0;
 
-    quiz.userAnswers = answers;
+    quiz.userAnswers = userAnswers;
     quiz.score = score;
     quiz.isCompleted = true;
     quiz.completedAt = new Date();
     await quiz.save();
+
+    await QuizAttempt.create({
+      user: req.user._id,
+      quiz: quiz._id,
+      document: quiz.document,
+      answers: userAnswers,
+      total,
+      correct,
+      score,
+    });
 
     res.status(200).json({
       total,
@@ -114,8 +126,23 @@ export const getQuizResults = async (req, res, next) => {
       throw new Error("Quiz has not been submitted yet");
     }
 
+    const answerByQuestionId = new Map(quiz.userAnswers.map((a) => [a.questionId.toString(), a.answer]));
     const total = quiz.questions.length;
-    const correct = quiz.questions.filter((q, i) => quiz.userAnswers[i] === q.correctAnswer).length;
+    let correct = 0;
+
+    const questions = quiz.questions.map((q) => {
+      const userAnswer = answerByQuestionId.get(q._id.toString()) ?? null;
+      const isCorrect = userAnswer === q.correctAnswer;
+      if (isCorrect) correct += 1;
+      return {
+        question: q.question,
+        options: q.options,
+        userAnswer,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        isCorrect,
+      };
+    });
 
     res.status(200).json({
       title: quiz.title,
@@ -124,14 +151,7 @@ export const getQuizResults = async (req, res, next) => {
       correct,
       incorrect: total - correct,
       percentage: quiz.score,
-      questions: quiz.questions.map((q, i) => ({
-        question: q.question,
-        options: q.options,
-        userAnswer: quiz.userAnswers[i] ?? null,
-        correctAnswer: q.correctAnswer,
-        explanation: q.explanation,
-        isCorrect: quiz.userAnswers[i] === q.correctAnswer,
-      })),
+      questions,
     });
   } catch (err) {
     next(err);

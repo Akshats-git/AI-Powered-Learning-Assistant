@@ -41,8 +41,8 @@ const QuizTakePage = () => {
   const doSubmit = async () => {
     setSubmitting(true);
     try {
-      const answerArray = Array.from({ length: total }, (_, i) => answers[i] ?? null);
-      await submitQuiz(id, answerArray);
+      const answerPairs = quiz.questions.map((q, i) => ({ questionId: q._id, answer: answers[i] ?? null }));
+      await submitQuiz(id, answerPairs);
       navigate(`/quizzes/${id}/results`);
     } catch {
       setSubmitting(false);

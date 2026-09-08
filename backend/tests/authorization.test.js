@@ -76,7 +76,9 @@ describe("cross-user authorization matrix", () => {
   });
 
   it("blocks submitting another user's quiz", async () => {
-    const res = await asIntruder("post", `/api/quizzes/${quiz._id}/submit`).send({ answers: ["4"] });
+    const res = await asIntruder("post", `/api/quizzes/${quiz._id}/submit`).send({
+      answers: [{ questionId: quiz.questions[0]._id, answer: "4" }],
+    });
     expect(res.status).toBe(404);
   });
 

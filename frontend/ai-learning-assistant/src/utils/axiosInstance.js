@@ -23,7 +23,7 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.message || error.message || "Something went wrong";
+    const message = error.response?.data?.error?.message || error.message || "Something went wrong";
     const requestUrl = error.config?.url || "";
     const isAuthEndpoint = requestUrl.includes("/api/auth/login") || requestUrl.includes("/api/auth/register");
 

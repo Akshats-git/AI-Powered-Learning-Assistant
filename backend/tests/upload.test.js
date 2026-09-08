@@ -23,7 +23,7 @@ describe("POST /api/documents/upload", () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/not a valid PDF/i);
+    expect(res.body.error.message).toMatch(/not a valid PDF/i);
     expect(await Document.countDocuments({})).toBe(0);
 
     // and it shouldn't leave the spoofed file behind on disk

@@ -20,25 +20,26 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-axiosInstance.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const message = error.response?.data?.error?.message || error.message || "Something went wrong";
-    const requestUrl = error.config?.url || "";
-    const isAuthEndpoint = requestUrl.includes("/api/auth/login") || requestUrl.includes("/api/auth/register");
+// Exported (rather than inlined in .use()) so it can be unit tested without
+// having to fake a real failing HTTP round-trip.
+export const handleResponseError = (error) => {
+  const message = error.response?.data?.error?.message || error.message || "Something went wrong";
+  const requestUrl = error.config?.url || "";
+  const isAuthEndpoint = requestUrl.includes("/api/auth/login") || requestUrl.includes("/api/auth/register");
 
-    if (error.response?.status === 401 && !isAuthEndpoint) {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-      toast.error(message);
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
-    } else {
-      toast.error(message);
+  if (error.response?.status === 401 && !isAuthEndpoint) {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    toast.error(message);
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
     }
-
-    return Promise.reject(error);
+  } else {
+    toast.error(message);
   }
-);
+
+  return Promise.reject(error);
+};
+
+axiosInstance.interceptors.response.use((response) => response, handleResponseError);
 
 export default axiosInstance;

@@ -5,6 +5,7 @@ import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { generate } from "../utils/aiClient.js";
 import { withInFlightGuard } from "../utils/inFlightGuard.js";
 import { assertWithinBudget, recordSpend } from "../utils/aiBudget.js";
+import { recordLlmCall } from "../utils/llmLedger.js";
 import { flashcardPrompt, quizPrompt, summaryPrompt, explainPrompt, chatPrompt } from "../utils/prompts.js";
 
 const CHAT_CONTEXT_SIZE = 10;
@@ -30,15 +31,16 @@ export const generateFlashcards = async (req, res, next) => {
     const cardCount = clampCount(count, 10, 30);
 
     const flashcardSet = await withInFlightGuard(`${req.user._id}:${documentId}:flashcards`, async () => {
-      let costUsd = 0;
+      let usageInfo = null;
       const result = await generate(flashcardPrompt(document.extractedText, cardCount), {
         json: true,
         feature: "flashcards",
-        onUsage: (usage) => {
-          costUsd = usage.costUsd || 0;
+        onUsage: (info) => {
+          usageInfo = info;
         },
       });
-      await recordSpend(req.user._id, costUsd);
+      await recordSpend(req.user._id, usageInfo?.costUsd || 0);
+      await recordLlmCall(req.user._id, req.id, "flashcards", usageInfo);
 
       if (!Array.isArray(result.flashcards)) {
         const err = new Error("AI response did not include a flashcards array");
@@ -76,15 +78,16 @@ export const generateQuiz = async (req, res, next) => {
     const questionCount = clampCount(numQuestions, 5, 20);
 
     const quiz = await withInFlightGuard(`${req.user._id}:${documentId}:quiz`, async () => {
-      let costUsd = 0;
+      let usageInfo = null;
       const result = await generate(quizPrompt(document.extractedText, questionCount), {
         json: true,
         feature: "quiz",
-        onUsage: (usage) => {
-          costUsd = usage.costUsd || 0;
+        onUsage: (info) => {
+          usageInfo = info;
         },
       });
-      await recordSpend(req.user._id, costUsd);
+      await recordSpend(req.user._id, usageInfo?.costUsd || 0);
+      await recordLlmCall(req.user._id, req.id, "quiz", usageInfo);
 
       if (!Array.isArray(result.questions)) {
         const err = new Error("AI response did not include a questions array");
@@ -121,14 +124,15 @@ export const generateSummary = async (req, res, next) => {
     await assertWithinBudget(req.user._id);
 
     const summary = await withInFlightGuard(`${req.user._id}:${documentId}:summary`, async () => {
-      let costUsd = 0;
+      let usageInfo = null;
       const result = await generate(summaryPrompt(document.extractedText), {
         feature: "summary",
-        onUsage: (usage) => {
-          costUsd = usage.costUsd || 0;
+        onUsage: (info) => {
+          usageInfo = info;
         },
       });
-      await recordSpend(req.user._id, costUsd);
+      await recordSpend(req.user._id, usageInfo?.costUsd || 0);
+      await recordLlmCall(req.user._id, req.id, "summary", usageInfo);
       return result;
     });
 
@@ -146,14 +150,15 @@ export const explainConcept = async (req, res, next) => {
     await assertWithinBudget(req.user._id);
 
     const explanation = await withInFlightGuard(`${req.user._id}:${documentId}:explain:${concept}`, async () => {
-      let costUsd = 0;
+      let usageInfo = null;
       const result = await generate(explainPrompt(document.extractedText, concept), {
         feature: "explain",
-        onUsage: (usage) => {
-          costUsd = usage.costUsd || 0;
+        onUsage: (info) => {
+          usageInfo = info;
         },
       });
-      await recordSpend(req.user._id, costUsd);
+      await recordSpend(req.user._id, usageInfo?.costUsd || 0);
+      await recordLlmCall(req.user._id, req.id, "explain", usageInfo);
       return result;
     });
 
@@ -173,14 +178,15 @@ export const chatWithDocument = async (req, res, next) => {
     const existingChat = await ChatHistory.findOne({ user: req.user._id, document: document._id });
     const recentHistory = existingChat ? existingChat.messages.slice(-CHAT_CONTEXT_SIZE) : [];
 
-    let costUsd = 0;
+    let usageInfo = null;
     const reply = await generate(chatPrompt(document.extractedText, recentHistory, message), {
       feature: "chat",
-      onUsage: (usage) => {
-        costUsd = usage.costUsd || 0;
+      onUsage: (info) => {
+        usageInfo = info;
       },
     });
-    await recordSpend(req.user._id, costUsd);
+    await recordSpend(req.user._id, usageInfo?.costUsd || 0);
+    await recordLlmCall(req.user._id, req.id, "chat", usageInfo);
 
     const chat = await ChatHistory.findOneAndUpdate(
       { user: req.user._id, document: document._id },

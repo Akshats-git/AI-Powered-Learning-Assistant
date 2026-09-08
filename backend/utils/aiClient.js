@@ -56,6 +56,7 @@ export const generate = async (prompt, { json = false, feature = "unknown", onUs
   const content = response.choices[0]?.message?.content || "";
   const usage = response.usage;
   const costUsd = estimateCostUsd(model, usage);
+  const latencyMs = Date.now() - startedAt;
 
   logger.info(
     {
@@ -65,14 +66,15 @@ export const generate = async (prompt, { json = false, feature = "unknown", onUs
       completionTokens: usage?.completion_tokens ?? null,
       totalTokens: usage?.total_tokens ?? null,
       estimatedCostUsd: costUsd,
-      latencyMs: Date.now() - startedAt,
+      latencyMs,
     },
     "LLM call completed"
   );
 
-  // Lets a caller record spend (e.g. against a per-user budget) without
-  // changing what generate() returns to its many existing callers.
-  if (onUsage) onUsage({ costUsd, usage, model });
+  // Lets a caller record spend (e.g. against a per-user budget, or a
+  // persistent cost ledger) without changing what generate() returns to its
+  // many existing callers.
+  if (onUsage) onUsage({ costUsd, usage, model, latencyMs });
 
   if (!json) return content;
 

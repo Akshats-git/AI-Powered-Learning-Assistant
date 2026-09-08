@@ -1,0 +1,13 @@
+{
+  "name": "e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node run.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "mongodb-memory-server": "^11.2.0"
+  }
+}

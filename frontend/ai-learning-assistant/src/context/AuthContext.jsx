@@ -1,8 +1,7 @@
-import { createContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { AuthContext } from "../hooks/useAuth";
 import * as authService from "../services/authService";
 import { TOKEN_STORAGE_KEY } from "../utils/constants";
-
-export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -11,6 +10,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!token) {
+      // No token to verify, so we're already done loading.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }

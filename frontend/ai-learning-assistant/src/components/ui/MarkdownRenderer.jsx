@@ -18,6 +18,7 @@ const components = {
   ),
   code(props) {
     const { children, className, node, ...rest } = props;
+    void node; // exclude react-markdown's internal AST node from the DOM props spread below
     const match = /language-(\w+)/.exec(className || "");
     return match ? (
       <SyntaxHighlighter

@@ -25,6 +25,8 @@ const DocumentListPage = () => {
       .finally(() => setLoading(false));
   };
 
+  // One-time fetch on mount; loading is already true from useState's initial value.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(fetchDocuments, []);
 
   const handleUploaded = (doc) => {

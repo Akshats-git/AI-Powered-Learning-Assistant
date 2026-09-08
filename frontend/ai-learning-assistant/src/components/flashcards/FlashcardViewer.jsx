@@ -13,6 +13,12 @@ const FlashcardViewer = ({ cards, onReview, onToggleFavorite }) => {
 
   const card = cards[index];
 
+  const goTo = (nextIndex) => {
+    if (nextIndex < 0 || nextIndex >= cards.length) return;
+    setIndex(nextIndex);
+    setFlipped(false);
+  };
+
   useEffect(() => {
     const handler = (e) => {
       if (e.key === "ArrowLeft") goTo(index - 1);
@@ -22,12 +28,6 @@ const FlashcardViewer = ({ cards, onReview, onToggleFavorite }) => {
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, cards.length]);
-
-  const goTo = (nextIndex) => {
-    if (nextIndex < 0 || nextIndex >= cards.length) return;
-    setIndex(nextIndex);
-    setFlipped(false);
-  };
 
   const handleFlip = () => {
     const wasFlipped = flipped;

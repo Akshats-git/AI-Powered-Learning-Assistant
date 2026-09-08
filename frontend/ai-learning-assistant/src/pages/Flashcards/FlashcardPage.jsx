@@ -25,7 +25,11 @@ const FlashcardPage = () => {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    let ignore = false;
     const setId = searchParams.get("setId");
+
+    // Resetting to a loading state when the set/document changes is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setNotFound(false);
 
@@ -37,10 +41,19 @@ const FlashcardPage = () => {
         });
 
     load
-      .then((res) => setSet(res.data))
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .then((res) => {
+        if (!ignore) setSet(res.data);
+      })
+      .catch(() => {
+        if (!ignore) setNotFound(true);
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [documentId, searchParams]);
 
   const handleReview = async (cardId) => {

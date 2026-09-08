@@ -24,10 +24,22 @@ const DocumentDetailPage = () => {
   const [activeTab, setActiveTab] = useState("content");
 
   useEffect(() => {
+    let ignore = false;
+
+    // Resetting to a loading state when `id` changes (navigating between documents) is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     getDocument(id)
-      .then((res) => setDocument(res.data))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (!ignore) setDocument(res.data);
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [id]);
 
   if (loading) {

@@ -64,6 +64,8 @@ const QuizzesTab = ({ documentId }) => {
       .finally(() => setLoading(false));
   };
 
+  // fetchQuizzes is also called imperatively after generate/delete, not just on mount/documentId change.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(fetchQuizzes, [documentId]);
 
   const handleGenerate = async (count) => {

@@ -23,6 +23,8 @@ const FlashcardsTab = ({ documentId }) => {
       .finally(() => setLoading(false));
   };
 
+  // fetchSets is also called imperatively after generate/delete, not just on mount/documentId change.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(fetchSets, [documentId]);
 
   const handleGenerate = async () => {

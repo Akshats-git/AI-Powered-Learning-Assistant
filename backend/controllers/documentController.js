@@ -16,10 +16,13 @@ const extractText = async (filePath) => {
   }
 };
 
-const toDocumentResponse = (doc) => ({
-  ...doc.toObject(),
-  fileUrl: `/uploads/${doc.fileName}`,
-});
+const toDocumentResponse = (doc) => {
+  const { extractedText, ...rest } = doc.toObject();
+  return {
+    ...rest,
+    fileUrl: `/uploads/${doc.fileName}`,
+  };
+};
 
 export const uploadDocument = async (req, res, next) => {
   try {
@@ -82,8 +85,9 @@ export const getDocument = async (req, res, next) => {
   try {
     const document = await getOwnedDocument(req.params.id, req.user._id);
 
-    document.lastAccessedAt = new Date();
-    await document.save();
+    const lastAccessedAt = new Date();
+    await Document.updateOne({ _id: document._id }, { $set: { lastAccessedAt } });
+    document.lastAccessedAt = lastAccessedAt;
 
     res.status(200).json(toDocumentResponse(document));
   } catch (err) {

@@ -6,6 +6,21 @@ import Quiz from "../models/Quiz.js";
 import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 
+// A browser-set mimetype is trivially spoofed (rename a .exe to .pdf), so
+// confirm the actual bytes before trusting an upload as a PDF.
+const PDF_MAGIC_BYTES = Buffer.from("%PDF-");
+
+const isPdfFile = async (filePath) => {
+  const fd = await fs.open(filePath, "r");
+  try {
+    const header = Buffer.alloc(PDF_MAGIC_BYTES.length);
+    await fd.read(header, 0, header.length, 0);
+    return header.equals(PDF_MAGIC_BYTES);
+  } finally {
+    await fd.close();
+  }
+};
+
 const extractText = async (filePath) => {
   const buffer = await fs.readFile(filePath);
   const parser = new PDFParse({ data: buffer });
@@ -31,25 +46,38 @@ export const uploadDocument = async (req, res, next) => {
       res.status(400);
       throw new Error("A PDF file is required");
     }
-    if (!req.body.title) {
-      res.status(400);
-      throw new Error("Title is required");
+
+    try {
+      if (!req.body.title) {
+        res.status(400);
+        throw new Error("Title is required");
+      }
+
+      if (!(await isPdfFile(req.file.path))) {
+        res.status(400);
+        throw new Error("Uploaded file is not a valid PDF");
+      }
+
+      const extractedText = await extractText(req.file.path);
+
+      const document = await Document.create({
+        user: req.user._id,
+        title: req.body.title,
+        fileName: req.file.filename,
+        filePath: req.file.path,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        extractedText,
+        hasExtractedText: Boolean(extractedText && extractedText.trim()),
+      });
+
+      res.status(201).json(toDocumentResponse(document));
+    } catch (err) {
+      // Multer already wrote the file to disk before this handler ran — don't
+      // leave it orphaned just because validation or extraction failed after.
+      await fs.unlink(req.file.path).catch(() => {});
+      throw err;
     }
-
-    const extractedText = await extractText(req.file.path);
-
-    const document = await Document.create({
-      user: req.user._id,
-      title: req.body.title,
-      fileName: req.file.filename,
-      filePath: req.file.path,
-      fileSize: req.file.size,
-      mimeType: req.file.mimetype,
-      extractedText,
-      hasExtractedText: Boolean(extractedText && extractedText.trim()),
-    });
-
-    res.status(201).json(toDocumentResponse(document));
   } catch (err) {
     next(err);
   }

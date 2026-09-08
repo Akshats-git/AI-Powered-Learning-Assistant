@@ -18,9 +18,13 @@ const stripAnswers = (quiz) => {
   };
 };
 
+const ANSWER_KEY_EXCLUDE = "-questions.correctAnswer -questions.explanation";
+
 export const listQuizzes = async (req, res, next) => {
   try {
-    const quizzes = await Quiz.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const quizzes = await Quiz.find({ user: req.user._id })
+      .select(ANSWER_KEY_EXCLUDE)
+      .sort({ createdAt: -1 });
     res.status(200).json(quizzes);
   } catch (err) {
     next(err);
@@ -29,9 +33,9 @@ export const listQuizzes = async (req, res, next) => {
 
 export const listQuizzesForDocument = async (req, res, next) => {
   try {
-    const quizzes = await Quiz.find({ user: req.user._id, document: req.params.documentId }).sort({
-      createdAt: -1,
-    });
+    const quizzes = await Quiz.find({ user: req.user._id, document: req.params.documentId })
+      .select(ANSWER_KEY_EXCLUDE)
+      .sort({ createdAt: -1 });
     res.status(200).json(quizzes);
   } catch (err) {
     next(err);

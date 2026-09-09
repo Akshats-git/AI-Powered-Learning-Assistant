@@ -26,6 +26,8 @@ import { embedTexts } from "../utils/embeddings.js";
 import { rerankChunks } from "../utils/rerank.js";
 import { verifyGroundedness } from "../utils/groundedness.js";
 import { rewriteQuery } from "../utils/queryRewrite.js";
+import { getCachedChatReply, cacheChatReply, getCachedSummary, cacheSummary } from "../utils/semanticCache.js";
+import { hashChunkText } from "../utils/embeddings.js";
 import { logger } from "../utils/logger.js";
 
 // Wider than the final answer set (DEFAULT_RESULT_LIMIT) on purpose — RRF
@@ -176,6 +178,17 @@ export const generateSummary = async (req, res, next) => {
     const { context, retrieved } = await buildGenerationContext(document);
     const prompt = retrieved ? retrievalSummaryPrompt(context) : summaryPrompt(context);
 
+    // Exact-hash cache: the summary of unchanged input is deterministic
+    // enough that a similarity threshold isn't needed the way chat's
+    // free-form questions need one — same document, same excerpts, same
+    // summary, so skip regenerating it altogether.
+    const contentHash = hashChunkText(context);
+    const cachedSummary = await getCachedSummary(document._id, contentHash);
+    if (cachedSummary !== null) {
+      res.status(200).json({ summary: cachedSummary });
+      return;
+    }
+
     const summary = await withInFlightGuard(`${req.user._id}:${documentId}:summary`, async () => {
       let usageInfo = null;
       const result = await generate(prompt, {
@@ -189,6 +202,7 @@ export const generateSummary = async (req, res, next) => {
       return result;
     });
 
+    cacheSummary(document._id, contentHash, summary).catch(() => {});
     res.status(200).json({ summary });
   } catch (err) {
     next(err);
@@ -253,20 +267,17 @@ const embedQuery = async (message, { userId, requestId, documentId }) => {
 // document only has Chunk rows once it's been through ingest.js, and hybrid
 // search only has something to fuse once at least one chunk matched the
 // query at all — both fall back to the old truncation-based chatPrompt
-// rather than sending the model an empty excerpt block.
-const buildChatPrompt = async ({ document, message, recentHistory, userId, requestId }) => {
+// rather than sending the model an empty excerpt block. Takes the already-
+// resolved `searchQuery`/`queryEmbedding` (see chatWithDocument) rather than
+// computing them itself, so the semantic-cache lookup and the retrieval path
+// always agree on exactly what "this question" means.
+const buildChatPrompt = async ({ document, message, recentHistory, searchQuery, queryEmbedding, userId, requestId }) => {
   const wholeDocumentFallback = () => ({ prompt: chatPrompt(document.extractedText, recentHistory, message), sources: [], retrievedContext: null });
 
   const chunks = await Chunk.find({ document: document._id })
     .select("text page endPage sectionPath embedding")
     .lean();
   if (chunks.length === 0) return wholeDocumentFallback();
-
-  // "What about the second one?" is unembeddable on its own — resolve it
-  // against the conversation before it's used for retrieval. The model still
-  // answers `message` verbatim below; only search uses the rewritten form.
-  const searchQuery = await rewriteQuery({ history: recentHistory, question: message, userId, requestId });
-  const queryEmbedding = await embedQuery(searchQuery, { userId, requestId, documentId: document._id });
 
   const fused = hybridSearch({
     query: searchQuery,
@@ -292,29 +303,63 @@ export const chatWithDocument = async (req, res, next) => {
     const existingChat = await ChatHistory.findOne({ user: req.user._id, document: document._id });
     const recentHistory = existingChat ? existingChat.messages.slice(-CHAT_CONTEXT_SIZE) : [];
 
-    const { prompt, sources, retrievedContext } = await buildChatPrompt({
-      document,
-      message,
-      recentHistory,
-      userId: req.user._id,
-      requestId: req.id,
-    });
+    // Resolved to a standalone form *before* anything else touches it — this
+    // is what makes the semantic cache safe to check regardless of
+    // conversation history: rewriteQuery already strips away "the second
+    // one"-style context-dependence, so two raw messages (from the same
+    // conversation or different ones entirely) that rewrite to the same
+    // standalone question are legitimately the same cache entry. Gating the
+    // cache on "no prior ChatHistory exists at all" instead would only ever
+    // fire on literally the first message a document's chat ever received —
+    // ChatHistory is one growing document per (user, document), not
+    // per-session, so that condition becomes permanently false after it.
+    const searchQuery = await rewriteQuery({ history: recentHistory, question: message, userId: req.user._id, requestId: req.id });
+    const queryEmbedding = await embedQuery(searchQuery, { userId: req.user._id, requestId: req.id, documentId: document._id });
 
-    let usageInfo = null;
-    const reply = await generate(prompt, {
-      feature: "chat",
-      onUsage: (info) => {
-        usageInfo = info;
-      },
-    });
-    await recordSpend(req.user._id, usageInfo?.costUsd || 0);
-    await recordLlmCall(req.user._id, req.id, "chat", usageInfo);
+    const cached = await getCachedChatReply(document._id, queryEmbedding);
 
-    // Only meaningful for a retrieval-augmented reply — there's no fixed
-    // excerpt set to check the whole-document fallback's claims against.
-    const groundedness = retrievedContext
-      ? await verifyGroundedness({ answer: reply, context: retrievedContext, userId: req.user._id, requestId: req.id })
-      : null;
+    let reply;
+    let sources;
+    let groundedness;
+
+    if (cached) {
+      ({ reply, sources, groundedness } = cached);
+    } else {
+      const { prompt, sources: freshSources, retrievedContext } = await buildChatPrompt({
+        document,
+        message,
+        recentHistory,
+        searchQuery,
+        queryEmbedding,
+        userId: req.user._id,
+        requestId: req.id,
+      });
+      sources = freshSources;
+
+      let usageInfo = null;
+      reply = await generate(prompt, {
+        feature: "chat",
+        onUsage: (info) => {
+          usageInfo = info;
+        },
+      });
+      await recordSpend(req.user._id, usageInfo?.costUsd || 0);
+      await recordLlmCall(req.user._id, req.id, "chat", usageInfo);
+
+      // Only meaningful for a retrieval-augmented reply — there's no fixed
+      // excerpt set to check the whole-document fallback's claims against.
+      groundedness = retrievedContext
+        ? await verifyGroundedness({ answer: reply, context: retrievedContext, userId: req.user._id, requestId: req.id })
+        : null;
+
+      if (sources.length > 0) {
+        // Awaited (not fire-and-forget): a request that lands right behind
+        // this one needs the write to have actually landed to get a cache
+        // hit — an un-awaited write here is a real race, not just a
+        // theoretical one, against a second request arriving immediately after.
+        await cacheChatReply(document._id, searchQuery, queryEmbedding, { reply, sources, groundedness }).catch(() => {});
+      }
+    }
 
     const chat = await ChatHistory.findOneAndUpdate(
       { user: req.user._id, document: document._id },

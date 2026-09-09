@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { GraduationCap, LayoutDashboard, FileText, Layers, HelpCircle, User, LogOut, X } from "lucide-react";
+import { GraduationCap, LayoutDashboard, FileText, Layers, HelpCircle, User, ShieldCheck, LogOut, X } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 
 const NAV_ITEMS = [
@@ -10,9 +10,12 @@ const NAV_ITEMS = [
   { to: "/profile", label: "Profile", icon: User },
 ];
 
+const ADMIN_NAV_ITEM = { to: "/admin/costs", label: "Cost Dashboard", icon: ShieldCheck };
+
 const Sidebar = ({ isOpen, onClose }) => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const navItems = user?.isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   const handleLogout = () => {
     logout();
@@ -43,7 +46,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}

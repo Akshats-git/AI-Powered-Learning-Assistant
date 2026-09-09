@@ -18,6 +18,7 @@ import QuizzesListPage from "./pages/Quizzes/QuizzesListPage";
 import QuizTakePage from "./pages/Quizzes/QuizTakePage";
 import QuizResultPage from "./pages/Quizzes/QuizResultPage";
 import ProfilePage from "./pages/Profile/ProfilePage";
+import AdminCostDashboardPage from "./pages/Admin/AdminCostDashboardPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
 const RootRedirect = () => {
@@ -71,6 +72,7 @@ const AppRoutes = () => (
       <Route path="/quizzes/:id" element={<QuizTakePage />} />
       <Route path="/quizzes/:id/results" element={<QuizResultPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/admin/costs" element={<AdminCostDashboardPage />} />
     </Route>
 
     <Route path="*" element={<NotFoundPage />} />

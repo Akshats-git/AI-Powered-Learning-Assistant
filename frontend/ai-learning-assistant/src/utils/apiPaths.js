@@ -40,4 +40,7 @@ export const API_PATHS = {
   DASHBOARD: {
     OVERVIEW: "/api/dashboard/overview",
   },
+  ADMIN: {
+    COSTS: "/api/admin/costs",
+  },
 };

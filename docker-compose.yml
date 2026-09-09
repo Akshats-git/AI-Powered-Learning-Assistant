@@ -1,0 +1,60 @@
+# `docker compose up --build` runs the whole app: Mongo, the API, and the
+# built frontend served by nginx. No Redis/worker service — this app has no
+# async job queue yet (BullMQ + a separate worker process is Phase 26 on the
+# roadmap); everything here reflects what's actually implemented today.
+#
+# Set OPENAI_API_KEY in a .env file next to this one (or export it before
+# running) to exercise the AI features; everything else works without it.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/ai-learning-assistant
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+      CLIENT_URL: http://localhost:5173
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    volumes:
+      # Uploaded PDFs survive a `docker compose restart`, unlike the
+      # "wiped on every deploy" problem the README flags for Render/Railway —
+      # this is still local disk, not S3/R2 (Phase 26), just a persistent one.
+      - uploads-data:/app/uploads
+
+  web:
+    build:
+      context: ./frontend/ai-learning-assistant
+      args:
+        # Baked into the JS bundle at build time — the *browser* has to be
+        # able to resolve this, so it's the host-mapped port below, not the
+        # Docker-internal service name "api".
+        VITE_API_BASE_URL: http://localhost:8000
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:8080"
+
+volumes:
+  mongo-data:
+  uploads-data:

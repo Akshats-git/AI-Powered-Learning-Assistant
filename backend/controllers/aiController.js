@@ -24,6 +24,7 @@ import { buildRetrievedContext, toSources } from "../utils/citations.js";
 import { selectChunksForBudget } from "../utils/contextSelection.js";
 import { embedTexts } from "../utils/embeddings.js";
 import { rerankChunks } from "../utils/rerank.js";
+import { verifyGroundedness } from "../utils/groundedness.js";
 import { logger } from "../utils/logger.js";
 
 // Wider than the final answer set (DEFAULT_RESULT_LIMIT) on purpose — RRF
@@ -252,7 +253,7 @@ const embedQuery = async (message, { userId, requestId, documentId }) => {
 // query at all — both fall back to the old truncation-based chatPrompt
 // rather than sending the model an empty excerpt block.
 const buildChatPrompt = async ({ document, message, recentHistory, userId, requestId }) => {
-  const wholeDocumentFallback = () => ({ prompt: chatPrompt(document.extractedText, recentHistory, message), sources: [] });
+  const wholeDocumentFallback = () => ({ prompt: chatPrompt(document.extractedText, recentHistory, message), sources: [], retrievedContext: null });
 
   const chunks = await Chunk.find({ document: document._id })
     .select("text page endPage sectionPath embedding")
@@ -270,8 +271,9 @@ const buildChatPrompt = async ({ document, message, recentHistory, userId, reque
   if (fused.length === 0) return wholeDocumentFallback();
 
   const results = await rerankChunks({ query: message, candidates: fused, limit: DEFAULT_RESULT_LIMIT, userId, requestId });
+  const retrievedContext = buildRetrievedContext(results);
 
-  return { prompt: retrievalChatPrompt(buildRetrievedContext(results), recentHistory, message), sources: toSources(results) };
+  return { prompt: retrievalChatPrompt(retrievedContext, recentHistory, message), sources: toSources(results), retrievedContext };
 };
 
 export const chatWithDocument = async (req, res, next) => {
@@ -284,7 +286,13 @@ export const chatWithDocument = async (req, res, next) => {
     const existingChat = await ChatHistory.findOne({ user: req.user._id, document: document._id });
     const recentHistory = existingChat ? existingChat.messages.slice(-CHAT_CONTEXT_SIZE) : [];
 
-    const { prompt, sources } = await buildChatPrompt({ document, message, recentHistory, userId: req.user._id, requestId: req.id });
+    const { prompt, sources, retrievedContext } = await buildChatPrompt({
+      document,
+      message,
+      recentHistory,
+      userId: req.user._id,
+      requestId: req.id,
+    });
 
     let usageInfo = null;
     const reply = await generate(prompt, {
@@ -296,6 +304,12 @@ export const chatWithDocument = async (req, res, next) => {
     await recordSpend(req.user._id, usageInfo?.costUsd || 0);
     await recordLlmCall(req.user._id, req.id, "chat", usageInfo);
 
+    // Only meaningful for a retrieval-augmented reply — there's no fixed
+    // excerpt set to check the whole-document fallback's claims against.
+    const groundedness = retrievedContext
+      ? await verifyGroundedness({ answer: reply, context: retrievedContext, userId: req.user._id, requestId: req.id })
+      : null;
+
     const chat = await ChatHistory.findOneAndUpdate(
       { user: req.user._id, document: document._id },
       {
@@ -303,7 +317,12 @@ export const chatWithDocument = async (req, res, next) => {
           messages: {
             $each: [
               { role: "user", content: message },
-              { role: "assistant", content: reply, ...(sources.length ? { sources } : {}) },
+              {
+                role: "assistant",
+                content: reply,
+                ...(sources.length ? { sources } : {}),
+                ...(groundedness ? { groundedness } : {}),
+              },
             ],
           },
         },
@@ -311,7 +330,7 @@ export const chatWithDocument = async (req, res, next) => {
       { new: true, upsert: true }
     );
 
-    res.status(200).json({ reply, sources, messages: chat.messages });
+    res.status(200).json({ reply, sources, groundedness, messages: chat.messages });
   } catch (err) {
     next(err);
   }

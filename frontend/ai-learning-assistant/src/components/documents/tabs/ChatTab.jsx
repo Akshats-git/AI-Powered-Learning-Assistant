@@ -66,7 +66,7 @@ const ChatTab = ({ documentId }) => {
                   <MarkdownRenderer content={m.content} />
                 )}
               </div>
-              {m.role === "assistant" && <ChatSources sources={m.sources} />}
+              {m.role === "assistant" && <ChatSources sources={m.sources} groundedness={m.groundedness} />}
             </div>
           ))
         )}

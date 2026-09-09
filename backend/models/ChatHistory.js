@@ -15,6 +15,19 @@ const sourceSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// The verdict from utils/groundedness.js's verifyGroundedness() — whether
+// the reply's claims actually check out against the excerpts it was given,
+// not just whether the right excerpts were retrieved. Absent (not `false`)
+// when verification wasn't run at all, so the UI can tell "checked and
+// clean" apart from "never checked."
+const groundednessSchema = new mongoose.Schema(
+  {
+    grounded: { type: Boolean, required: true },
+    unsupportedClaims: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     role: { type: String, enum: ["user", "assistant"], required: true },
@@ -24,6 +37,7 @@ const messageSchema = new mongoose.Schema(
     // to search — left undefined (not `[]`) everywhere else so older
     // messages and user messages don't carry a meaningless empty array.
     sources: { type: [sourceSchema], default: undefined },
+    groundedness: { type: groundednessSchema, default: undefined },
   },
   { _id: false }
 );

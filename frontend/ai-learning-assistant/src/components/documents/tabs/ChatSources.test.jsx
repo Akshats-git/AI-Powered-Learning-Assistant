@@ -60,4 +60,36 @@ describe("ChatSources", () => {
     expect(screen.queryByText(/^p\./)).not.toBeInTheDocument();
     expect(screen.getByText("No page info.")).toBeInTheDocument();
   });
+
+  describe("groundedness warning", () => {
+    it("shows nothing extra when groundedness wasn't checked (undefined)", () => {
+      render(<ChatSources sources={SOURCES} groundedness={undefined} />);
+      expect(screen.queryByText(/may not be fully supported/i)).not.toBeInTheDocument();
+    });
+
+    it("shows nothing extra when the reply was fully grounded", () => {
+      render(<ChatSources sources={SOURCES} groundedness={{ grounded: true, unsupportedClaims: [] }} />);
+      expect(screen.queryByText(/may not be fully supported/i)).not.toBeInTheDocument();
+    });
+
+    it("shows a warning, always expanded, when the reply was flagged as ungrounded", () => {
+      render(
+        <ChatSources
+          sources={SOURCES}
+          groundedness={{ grounded: false, unsupportedClaims: ["The study covered 10,000 patients."] }}
+        />
+      );
+
+      expect(screen.getByText(/may not be fully supported/i)).toBeInTheDocument();
+      // Unlike sources, the warning isn't behind a click — it's a warning, not detail.
+      expect(screen.getByText("The study covered 10,000 patients.")).toBeInTheDocument();
+    });
+
+    it("renders the warning even when there are no sources at all", () => {
+      const { container } = render(<ChatSources sources={[]} groundedness={{ grounded: false, unsupportedClaims: [] }} />);
+
+      expect(screen.getByText(/may not be fully supported/i)).toBeInTheDocument();
+      expect(container).not.toBeEmptyDOMElement();
+    });
+  });
 });

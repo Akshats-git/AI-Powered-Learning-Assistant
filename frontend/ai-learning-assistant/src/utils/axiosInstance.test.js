@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import axios from "axios";
 import toast from "react-hot-toast";
 import axiosInstance, { handleResponseError } from "./axiosInstance";
-import { TOKEN_STORAGE_KEY } from "./constants";
+import { TOKEN_STORAGE_KEY, CSRF_TOKEN_STORAGE_KEY } from "./constants";
 
 vi.mock("react-hot-toast", () => ({
   default: { error: vi.fn() },
@@ -55,6 +55,24 @@ describe("handleResponseError", () => {
     });
     expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
     expect(window.location.href).toBe("/login");
+  });
+
+  it("attaches the stored CSRF token as a header on the silent refresh request", async () => {
+    vi.spyOn(axios, "post").mockResolvedValue({ data: { token: "fresh-token", csrfToken: "next-csrf" } });
+    vi.spyOn(axiosInstance, "request").mockResolvedValue({ data: { ok: true } });
+    localStorage.setItem(TOKEN_STORAGE_KEY, "stale-token");
+    localStorage.setItem(CSRF_TOKEN_STORAGE_KEY, "stored-csrf");
+    const error = {
+      response: { status: 401, data: { error: { message: "Session expired" } } },
+      config: { url: "/api/documents", headers: {} },
+    };
+
+    await handleResponseError(error);
+    expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/api/auth/refresh"), null, {
+      withCredentials: true,
+      headers: { "X-CSRF-Token": "stored-csrf" },
+    });
+    expect(localStorage.getItem(CSRF_TOKEN_STORAGE_KEY)).toBe("next-csrf");
   });
 
   it("retries the original request with the new token when the silent refresh succeeds", async () => {

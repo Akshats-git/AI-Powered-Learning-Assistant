@@ -1,6 +1,6 @@
 import axios from "axios";
 import toast from "react-hot-toast";
-import { TOKEN_STORAGE_KEY } from "./constants";
+import { TOKEN_STORAGE_KEY, CSRF_TOKEN_STORAGE_KEY } from "./constants";
 import { API_PATHS } from "./apiPaths";
 
 const axiosInstance = axios.create({
@@ -33,8 +33,15 @@ let refreshPromise = null;
 
 const attemptRefresh = () => {
   if (!refreshPromise) {
+    // The refresh endpoint is CSRF-protected (utils/csrf.js on the backend):
+    // it requires this header to match a cookie it can't be read from
+    // cross-origin, so only echo it when we actually have one on file.
+    const csrfToken = localStorage.getItem(CSRF_TOKEN_STORAGE_KEY);
+    const config = { withCredentials: true };
+    if (csrfToken) config.headers = { "X-CSRF-Token": csrfToken };
+
     refreshPromise = axios
-      .post(`${import.meta.env.VITE_API_BASE_URL}${API_PATHS.AUTH.REFRESH}`, null, { withCredentials: true })
+      .post(`${import.meta.env.VITE_API_BASE_URL}${API_PATHS.AUTH.REFRESH}`, null, config)
       .finally(() => {
         refreshPromise = null;
       });
@@ -44,6 +51,7 @@ const attemptRefresh = () => {
 
 const forceLogout = (message) => {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
+  localStorage.removeItem(CSRF_TOKEN_STORAGE_KEY);
   toast.error(message);
   if (window.location.pathname !== "/login") {
     window.location.href = "/login";
@@ -63,6 +71,7 @@ export const handleResponseError = async (error) => {
     try {
       const { data } = await attemptRefresh();
       localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+      if (data.csrfToken) localStorage.setItem(CSRF_TOKEN_STORAGE_KEY, data.csrfToken);
       originalRequest.headers.Authorization = `Bearer ${data.token}`;
       return axiosInstance.request(originalRequest);
     } catch {

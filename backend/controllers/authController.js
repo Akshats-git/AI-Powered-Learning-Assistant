@@ -6,6 +6,7 @@ import { isAdminEmail } from "../utils/adminEmails.js";
 import { createResetToken, consumeResetToken } from "../utils/passwordResetStore.js";
 import { createVerificationToken, consumeVerificationToken } from "../utils/emailVerificationStore.js";
 import { sendMail } from "../utils/mailer.js";
+import { issueCsrfToken, clearCsrfCookie, isCsrfTokenValid } from "../utils/csrf.js";
 
 const MAX_FAILED_ATTEMPTS = Number(process.env.ACCOUNT_LOCK_MAX_ATTEMPTS) || 5;
 const LOCK_DURATION_MS = (Number(process.env.ACCOUNT_LOCK_MINUTES) || 15) * 60 * 1000;
@@ -16,7 +17,7 @@ const LOCK_DURATION_MS = (Number(process.env.ACCOUNT_LOCK_MINUTES) || 15) * 60 *
 const issueTokens = async (res, user) => {
   const { jti, familyId } = await startRefreshFamily(user._id);
   setRefreshCookie(res, generateRefreshToken(user._id, jti, familyId));
-  return generateAccessToken(user._id);
+  return { accessToken: generateAccessToken(user._id), csrfToken: issueCsrfToken(res) };
 };
 
 // isAdmin is never stored — it's computed from ADMIN_EMAILS on every
@@ -50,10 +51,8 @@ export const register = async (req, res, next) => {
     const user = await User.create({ username, email, password });
     await sendVerificationEmail(user);
 
-    res.status(201).json({
-      user: withIsAdmin(user),
-      token: await issueTokens(res, user),
-    });
+    const { accessToken, csrfToken } = await issueTokens(res, user);
+    res.status(201).json({ user: withIsAdmin(user), token: accessToken, csrfToken });
   } catch (err) {
     next(err);
   }
@@ -99,10 +98,8 @@ export const login = async (req, res, next) => {
     if (user.needsPasswordRehash()) user.password = password;
     await user.save();
 
-    res.status(200).json({
-      user: withIsAdmin(user),
-      token: await issueTokens(res, user),
-    });
+    const { accessToken, csrfToken } = await issueTokens(res, user);
+    res.status(200).json({ user: withIsAdmin(user), token: accessToken, csrfToken });
   } catch (err) {
     next(err);
   }
@@ -114,6 +111,17 @@ export const refresh = async (req, res, next) => {
     if (!token) {
       res.status(401);
       throw new Error("Not authorized, no refresh token");
+    }
+
+    // CSRF check comes after "is there even a session," so a plain missing
+    // cookie still reads as a clean 401 rather than a confusing 403 — but
+    // before anything the presented refresh token can actually do, since
+    // this is the one cookie-authenticated endpoint that mints new
+    // credentials. See utils/csrf.js for why the header (not just the
+    // cookie) is required.
+    if (!isCsrfTokenValid(req)) {
+      res.status(403);
+      throw new Error("Invalid or missing CSRF token");
     }
 
     let decoded;
@@ -152,12 +160,17 @@ export const refresh = async (req, res, next) => {
     }
 
     setRefreshCookie(res, generateRefreshToken(user._id, rotation.jti, rotation.familyId));
-    res.status(200).json({ token: generateAccessToken(user._id) });
+    res.status(200).json({ token: generateAccessToken(user._id), csrfToken: issueCsrfToken(res) });
   } catch (err) {
     next(err);
   }
 };
 
+// Not CSRF-gated: a forged logout is a nuisance (it ends a session the
+// attacker doesn't control the replacement of), not an account compromise —
+// unlike /refresh, it can't be used to mint anything. Requiring the header
+// here would only make an already-idempotent, low-consequence action harder
+// to call from a plain <a>/fetch with no token in hand yet.
 export const logout = async (req, res, next) => {
   try {
     const token = readRefreshCookie(req);
@@ -174,6 +187,7 @@ export const logout = async (req, res, next) => {
     }
 
     clearRefreshCookie(res);
+    clearCsrfCookie(res);
     res.status(200).json({ message: "Logged out" });
   } catch (err) {
     next(err);

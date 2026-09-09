@@ -4,7 +4,7 @@ import app from "../app.js";
 import User from "../models/User.js";
 import { createResetToken } from "../utils/passwordResetStore.js";
 
-const extractRefreshCookie = (res) => res.headers["set-cookie"]?.find((c) => c.startsWith("refreshToken="))?.split(";")[0];
+const extractCookie = (res, name) => res.headers["set-cookie"]?.find((c) => c.startsWith(`${name}=`))?.split(";")[0];
 
 describe("forgot password", () => {
   it("returns the identical response for a registered and an unregistered email", async () => {
@@ -62,13 +62,17 @@ describe("reset password", () => {
     const registerRes = await agent
       .post("/api/auth/register")
       .send({ username: "Priya", email, password: "old-password" });
-    const staleRefreshCookie = extractRefreshCookie(registerRes);
+    const staleRefreshCookie = extractCookie(registerRes, "refreshToken");
+    const staleCsrfCookie = extractCookie(registerRes, "csrfToken");
 
     const user = await User.findOne({ email });
     const token = await createResetToken(user._id);
     await request(app).post("/api/auth/reset-password").send({ token, newPassword: "new-password" });
 
-    const refreshAttempt = await request(app).post("/api/auth/refresh").set("Cookie", staleRefreshCookie);
+    const refreshAttempt = await request(app)
+      .post("/api/auth/refresh")
+      .set("Cookie", `${staleRefreshCookie}; ${staleCsrfCookie}`)
+      .set("X-CSRF-Token", registerRes.body.csrfToken);
     expect(refreshAttempt.status).toBe(401);
   });
 });

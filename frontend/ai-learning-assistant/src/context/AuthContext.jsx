@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AuthContext } from "../hooks/useAuth";
 import * as authService from "../services/authService";
-import { TOKEN_STORAGE_KEY } from "../utils/constants";
+import { TOKEN_STORAGE_KEY, CSRF_TOKEN_STORAGE_KEY } from "../utils/constants";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -26,6 +26,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     const res = await authService.login(credentials);
     localStorage.setItem(TOKEN_STORAGE_KEY, res.data.token);
+    localStorage.setItem(CSRF_TOKEN_STORAGE_KEY, res.data.csrfToken);
     setUser(res.data.user);
     return res.data.user;
   };
@@ -33,12 +34,14 @@ export const AuthProvider = ({ children }) => {
   const register = async (data) => {
     const res = await authService.register(data);
     localStorage.setItem(TOKEN_STORAGE_KEY, res.data.token);
+    localStorage.setItem(CSRF_TOKEN_STORAGE_KEY, res.data.csrfToken);
     setUser(res.data.user);
     return res.data.user;
   };
 
   const logout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(CSRF_TOKEN_STORAGE_KEY);
     setUser(null);
     // Best-effort: clears the httpOnly refresh cookie server-side. Local
     // state is already cleared above regardless of whether this succeeds.

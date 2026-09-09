@@ -1,5 +1,24 @@
 import Flashcard from "../models/Flashcard.js";
+import ReviewLog from "../models/ReviewLog.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
+import { scheduleFsrs, createInitialFsrsState } from "../utils/fsrs.js";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// A never-reviewed card has no `schedule.stability` yet (the default `{}`
+// leaves it `null`) — FSRS needs to be told that explicitly rather than
+// treating a null stability as zero, which would make its very first
+// interval calculation nonsensical.
+const scheduleStateFromCard = (card) =>
+  card.schedule?.stability == null
+    ? createInitialFsrsState()
+    : {
+        stability: card.schedule.stability,
+        difficulty: card.schedule.difficulty,
+        reps: card.schedule.reps,
+        lapses: card.schedule.lapses,
+        lastReviewedAt: card.schedule.lastReviewedAt,
+      };
 
 const withProgress = (set) => {
   const obj = set.toObject();
@@ -63,6 +82,7 @@ export const getFlashcardSet = async (req, res, next) => {
 
 export const reviewCard = async (req, res, next) => {
   try {
+    const { grade } = req.body;
     const set = await findOwnedSet(req.params.setId, req.user._id);
     const card = set.cards.id(req.params.cardId);
     if (!card) {
@@ -70,8 +90,35 @@ export const reviewCard = async (req, res, next) => {
       throw new Error("Card not found");
     }
 
+    const stateBefore = scheduleStateFromCard(card);
+    const reviewedAt = new Date();
+    const result = scheduleFsrs(stateBefore, grade, reviewedAt);
+
+    card.schedule = {
+      stability: result.stability,
+      difficulty: result.difficulty,
+      reps: result.reps,
+      lapses: result.lapses,
+      lastReviewedAt: result.lastReviewedAt,
+      dueDate: result.dueDate,
+    };
     card.isReviewed = true;
     await set.save();
+
+    // An immutable record of the grade itself — the card's `schedule` above
+    // only ever holds its *current* state, and the scheduler-comparison
+    // experiment (and any future retention chart) needs the full history.
+    await ReviewLog.create({
+      user: req.user._id,
+      flashcardSet: set._id,
+      cardId: card._id,
+      algorithm: "fsrs",
+      grade,
+      reviewedAt,
+      elapsedDays: stateBefore.lastReviewedAt ? (reviewedAt.getTime() - new Date(stateBefore.lastReviewedAt).getTime()) / MS_PER_DAY : null,
+      stateBefore,
+      stateAfter: result,
+    });
 
     res.status(200).json(withProgress(set));
   } catch (err) {

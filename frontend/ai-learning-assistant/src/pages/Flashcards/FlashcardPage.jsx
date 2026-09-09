@@ -56,13 +56,13 @@ const FlashcardPage = () => {
     };
   }, [documentId, searchParams]);
 
-  const handleReview = async (cardId) => {
+  const handleReview = async (cardId, grade) => {
     setSet((prev) => ({
       ...prev,
       cards: prev.cards.map((c) => (c._id === cardId ? { ...c, isReviewed: true } : c)),
     }));
     try {
-      await reviewCard(set._id, cardId);
+      await reviewCard(set._id, cardId, grade);
     } catch {
       // error toast handled by the axios response interceptor
     }

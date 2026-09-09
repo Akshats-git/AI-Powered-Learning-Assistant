@@ -100,7 +100,9 @@ describe("cross-user authorization matrix", () => {
 
   it("blocks reviewing a card in another user's flashcard set", async () => {
     const cardId = flashcardSet.cards[0]._id;
-    const res = await asIntruder("put", `/api/flashcards/${flashcardSet._id}/cards/${cardId}/review`);
+    // A valid body so this actually exercises the ownership check (404) —
+    // not validation rejecting a missing `grade` (400) for an unrelated reason.
+    const res = await asIntruder("put", `/api/flashcards/${flashcardSet._id}/cards/${cardId}/review`).send({ grade: "good" });
     expect(res.status).toBe(404);
   });
 

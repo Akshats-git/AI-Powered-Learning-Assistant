@@ -43,4 +43,7 @@ export const API_PATHS = {
   ADMIN: {
     COSTS: "/api/admin/costs",
   },
+  REVIEW: {
+    DUE: "/api/review/due",
+  },
 };

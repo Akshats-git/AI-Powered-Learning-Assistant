@@ -6,6 +6,7 @@ import { FileText, Layers, HelpCircle, ArrowRight, Inbox } from "lucide-react";
 import { getOverview } from "../../services/dashboardService";
 import { useAuth } from "../../hooks/useAuth";
 import WeakAreasPanel from "../../components/dashboard/WeakAreasPanel";
+import StreakBadge from "../../components/dashboard/StreakBadge";
 
 const STAT_CARDS = [
   { key: "totalDocuments", label: "Total Documents", icon: FileText, tint: "bg-emerald-50 text-emerald-600" },
@@ -55,9 +56,12 @@ const DashboardPage = () => {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Welcome back{user?.username ? `, ${user.username}` : ""}.</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">Welcome back{user?.username ? `, ${user.username}` : ""}.</p>
+        </div>
+        <StreakBadge />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

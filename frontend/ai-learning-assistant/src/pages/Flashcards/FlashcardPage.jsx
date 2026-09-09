@@ -11,6 +11,7 @@ import {
   deleteFlashcardSet,
 } from "../../services/flashcardService";
 import FlashcardViewer from "../../components/flashcards/FlashcardViewer";
+import RetentionForecastChart from "../../components/flashcards/RetentionForecastChart";
 import ConfirmDeleteModal from "../../components/ui/ConfirmDeleteModal";
 
 const FlashcardPage = () => {
@@ -121,6 +122,10 @@ const FlashcardPage = () => {
           </div>
 
           <FlashcardViewer cards={set.cards} onReview={handleReview} onToggleFavorite={handleToggleFavorite} />
+
+          <div className="mt-6">
+            <RetentionForecastChart setId={set._id} />
+          </div>
         </>
       )}
 

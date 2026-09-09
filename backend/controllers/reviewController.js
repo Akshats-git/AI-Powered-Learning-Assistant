@@ -1,4 +1,7 @@
 import Flashcard from "../models/Flashcard.js";
+import ReviewLog from "../models/ReviewLog.js";
+import { forecastRetention } from "../utils/retentionForecast.js";
+import { computeStreak } from "../utils/streaks.js";
 
 const DEFAULT_QUEUE_LIMIT = 20;
 const MAX_QUEUE_LIMIT = 100;
@@ -47,6 +50,44 @@ export const getDueQueue = async (req, res, next) => {
     due.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
     res.status(200).json({ items: due.slice(0, limit), total: due.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const FORECAST_DAYS = 90;
+
+// "Chart projected recall over the next 90 days per deck" — one flashcard
+// set at a time, since retention is a per-deck story a learner cares about
+// ("how well am I retaining *this* material"), not a single number across
+// every document they've ever uploaded.
+export const getRetentionForecast = async (req, res, next) => {
+  try {
+    const set = await Flashcard.findOne({ _id: req.params.setId, user: req.user._id }).select("cards").lean();
+    if (!set) {
+      res.status(404);
+      throw new Error("Flashcard set not found");
+    }
+
+    const points = forecastRetention(
+      set.cards.map((c) => ({ stability: c.schedule?.stability ?? null, lastReviewedAt: c.schedule?.lastReviewedAt ?? null })),
+      { days: FORECAST_DAYS }
+    );
+
+    res.status(200).json({ setId: set._id, points });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Recomputed from ReviewLog on every request rather than an incrementing
+// counter — see utils/streaks.js for why that's the more robust choice.
+export const getStreak = async (req, res, next) => {
+  try {
+    const logs = await ReviewLog.find({ user: req.user._id }).select("reviewedAt").lean();
+    const streak = computeStreak(logs.map((l) => l.reviewedAt));
+
+    res.status(200).json(streak);
   } catch (err) {
     next(err);
   }

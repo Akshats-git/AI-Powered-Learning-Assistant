@@ -192,3 +192,57 @@ describe("GET /api/review/due", () => {
     void user;
   });
 });
+
+describe("GET /api/review/forecast/:setId", () => {
+  it("returns a 91-point retention curve for a deck with reviewed cards", async () => {
+    const { user, token } = await createUserWithToken();
+    const document = await makeDocument(user._id);
+    const set = await makeSet(user._id, document._id, [{ question: "Q1", answer: "A1" }]);
+    const cardId = set.cards[0]._id;
+
+    await request(app)
+      .put(`/api/flashcards/${set._id}/cards/${cardId}/review`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ grade: "good" });
+
+    const res = await request(app).get(`/api/review/forecast/${set._id}`).set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.points).toHaveLength(91);
+    expect(res.body.points[0].avgRetention).toBeGreaterThan(0.9);
+  });
+
+  it("404s for another user's flashcard set", async () => {
+    const { user } = await createUserWithToken();
+    const { token: otherToken } = await createUserWithToken();
+    const document = await makeDocument(user._id);
+    const set = await makeSet(user._id, document._id, [{ question: "Q1", answer: "A1" }]);
+
+    const res = await request(app).get(`/api/review/forecast/${set._id}`).set("Authorization", `Bearer ${otherToken}`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/review/streak", () => {
+  it("returns a zero streak for a user with no review history", async () => {
+    const { token } = await createUserWithToken();
+    const res = await request(app).get("/api/review/streak").set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ currentStreak: 0, longestStreak: 0, activeToday: false });
+  });
+
+  it("counts today's review as a streak of 1", async () => {
+    const { user, token } = await createUserWithToken();
+    const document = await makeDocument(user._id);
+    const set = await makeSet(user._id, document._id, [{ question: "Q1", answer: "A1" }]);
+
+    await request(app)
+      .put(`/api/flashcards/${set._id}/cards/${set.cards[0]._id}/review`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ grade: "good" });
+
+    const res = await request(app).get("/api/review/streak").set("Authorization", `Bearer ${token}`);
+    expect(res.body).toMatchObject({ currentStreak: 1, activeToday: true });
+  });
+});

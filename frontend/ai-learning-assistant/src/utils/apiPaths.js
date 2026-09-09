@@ -45,6 +45,8 @@ export const API_PATHS = {
   },
   REVIEW: {
     DUE: "/api/review/due",
+    STREAK: "/api/review/streak",
+    FORECAST: (setId) => `/api/review/forecast/${setId}`,
   },
   MASTERY: {
     LIST: "/api/mastery",

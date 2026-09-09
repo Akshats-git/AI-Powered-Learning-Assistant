@@ -41,7 +41,10 @@ test("uploads a PDF and sees it appear in the document list", async ({ page, req
   await page.getByRole("button", { name: /create account/i }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 
-  await page.getByRole("link", { name: /documents/i }).click();
+  // A fresh account's dashboard also shows a "Go to Documents" empty-state
+  // link, so `exact` is needed — otherwise a loose /documents/i match hits
+  // both that and the sidebar nav link.
+  await page.getByRole("link", { name: "Documents", exact: true }).click();
   await expect(page).toHaveURL(/\/documents$/);
 
   const title = `E2E Document ${Date.now()}`;

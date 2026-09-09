@@ -44,7 +44,7 @@ generation, helmet + compression + express-rate-limit for hardening.
 ```
 backend/
 ├── config/           db.js
-├── controllers/      auth, document, ai, flashcard, quiz, dashboard
+├── controllers/      auth, document, ai, flashcard, quiz, dashboard, admin
 ├── middlewares/      auth, upload, error, rate limiter
 ├── models/           User, Document, Flashcard, Quiz, ChatHistory
 ├── routes/           one router per resource, mounted under /api/*
@@ -85,11 +85,13 @@ npm run dev             # http://localhost:8000
 PORT=8000
 MONGO_URI=<your MongoDB connection string>
 JWT_SECRET=<long random string>
-JWT_EXPIRES_IN=7d
 OPENAI_API_KEY=<your OpenAI API key>
 OPENAI_MODEL=gpt-4o-mini
 CLIENT_URL=http://localhost:5173
 ```
+
+See `backend/.env.example` for the optional variables (access/refresh token
+lifetimes, account lockout thresholds, AI budget cap) and their defaults.
 
 ### Frontend
 
@@ -126,7 +128,29 @@ Then open `http://localhost:5173`, register an account, and upload a PDF.
   be capped per user per month with `MONTHLY_AI_BUDGET_USD` (unset = no cap).
 - Quiz answer keys are never sent to the client until a quiz is submitted.
   Grading happens on the server.
+- Login/register/refresh are rate limited to 20 requests per 15 minutes per
+  IP, and an account locks itself out for 15 minutes after 5 consecutive
+  wrong passwords — both blunt email enumeration and credential stuffing.
+  Locked-out and nonexistent-user logins return the identical "Invalid email
+  or password" response so neither leaks which emails are registered.
+- Auth uses a short-lived (15 min) access token returned in the response body
+  plus a 7-day refresh token in an httpOnly cookie; `POST /api/auth/refresh`
+  rotates both. A stolen access token is only useful for minutes; the refresh
+  token never touches JavaScript-readable storage. There's no server-side
+  revocation list yet, so a compromised refresh token is still valid until it
+  expires — full rotation-with-reuse-detection is still open (Phase 31).
 - Uploaded files are stored on local disk under `backend/uploads/`. For a
-  production deploy with an ephemeral filesystem, swap in S3 or Cloudinary.
+  production deploy with an ephemeral filesystem, swap in S3 or Cloudinary —
+  until then, a document whose file was wiped by a redeploy shows a "file no
+  longer available" banner instead of a broken viewer (chat/flashcards/quiz
+  still work since the extracted text is stored in MongoDB, not on disk).
 - `GET /health` is a liveness check; `GET /ready` also verifies MongoDB is
   connected — point an orchestrator's readiness probe at the latter.
+- Set `ADMIN_EMAILS` (comma-separated) to unlock a read-only cost dashboard at
+  `/admin/costs` — spend and token usage per user per day, from the `LlmCall`
+  ledger. It's an allowlist check on every request, not a stored role, so
+  granting/revoking access is just an env var change.
+- CI runs backend/frontend tests, `npm audit --audit-level=high` on both,
+  CodeQL static analysis, and the Playwright E2E suite against a real
+  backend + ephemeral in-memory MongoDB — see
+  [.github/workflows/ci.yml](.github/workflows/ci.yml).

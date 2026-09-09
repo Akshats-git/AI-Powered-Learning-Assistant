@@ -5,6 +5,7 @@ import Flashcard from "../models/Flashcard.js";
 import Quiz from "../models/Quiz.js";
 import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
+import { buildPageMap } from "../utils/pageMap.js";
 
 // A browser-set mimetype is trivially spoofed (rename a .exe to .pdf), so
 // confirm the actual bytes before trusting an upload as a PDF.
@@ -21,12 +22,15 @@ const isPdfFile = async (filePath) => {
   }
 };
 
+// Returns the per-page text alongside the concatenated string, so the page
+// boundaries can be recorded now rather than guessed at later. pdf-parse joins
+// pages with a "\n\n" separator, which `buildPageMap` accounts for.
 const extractText = async (filePath) => {
   const buffer = await fs.readFile(filePath);
   const parser = new PDFParse({ data: buffer });
   try {
     const result = await parser.getText();
-    return result.text || "";
+    return { text: result.text || "", pages: result.pages || [] };
   } finally {
     await parser.destroy();
   }
@@ -47,7 +51,9 @@ const fileExists = async (filePath) => {
 };
 
 const toDocumentResponse = async (doc) => {
-  const { extractedText, ...rest } = doc.toObject();
+  // `pageMap` is retrieval machinery, not something a client renders — and on
+  // an 800-page PDF it is 800 objects nobody asked for.
+  const { extractedText, pageMap, ...rest } = doc.toObject();
   return {
     ...rest,
     fileUrl: `/uploads/${doc.fileName}`,
@@ -73,7 +79,8 @@ export const uploadDocument = async (req, res, next) => {
         throw new Error("Uploaded file is not a valid PDF");
       }
 
-      const extractedText = await extractText(req.file.path);
+      const { text: extractedText, pages } = await extractText(req.file.path);
+      const pageMap = buildPageMap(pages);
 
       const document = await Document.create({
         user: req.user._id,
@@ -84,6 +91,8 @@ export const uploadDocument = async (req, res, next) => {
         mimeType: req.file.mimetype,
         extractedText,
         hasExtractedText: Boolean(extractedText && extractedText.trim()),
+        pageCount: pageMap.length,
+        pageMap,
       });
 
       res.status(201).json(await toDocumentResponse(document));
@@ -104,7 +113,7 @@ export const listDocuments = async (req, res, next) => {
 
     const [documents, total] = await Promise.all([
       Document.find({ user: req.user._id })
-        .select("-extractedText")
+        .select("-extractedText -pageMap")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),

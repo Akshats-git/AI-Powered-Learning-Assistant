@@ -8,6 +8,8 @@ export const API_PATHS = {
     UPDATE_PASSWORD: "/api/auth/update-password",
     FORGOT_PASSWORD: "/api/auth/forgot-password",
     RESET_PASSWORD: "/api/auth/reset-password",
+    VERIFY_EMAIL: "/api/auth/verify-email",
+    RESEND_VERIFICATION: "/api/auth/resend-verification",
   },
   DOCUMENTS: {
     UPLOAD: "/api/documents/upload",

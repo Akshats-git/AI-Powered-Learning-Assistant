@@ -35,3 +35,9 @@ export const resetPasswordSchema = requestSchema({
     newPassword: z.string().min(6, "New password must be at least 6 characters"),
   }),
 });
+
+export const verifyEmailSchema = requestSchema({
+  body: z.object({
+    token: z.string().min(1, "Verification token is required"),
+  }),
+});

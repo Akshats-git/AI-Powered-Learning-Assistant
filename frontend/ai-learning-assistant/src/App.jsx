@@ -11,6 +11,7 @@ import LoginPage from "./pages/Auth/LoginPage";
 import RegisterPage from "./pages/Auth/RegisterPage";
 import ForgotPasswordPage from "./pages/Auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/Auth/ResetPasswordPage";
+import VerifyEmailPage from "./pages/Auth/VerifyEmailPage";
 import DashboardPage from "./pages/Dashboard/DashboardPage";
 import DocumentListPage from "./pages/Documents/DocumentListPage";
 import DocumentDetailPage from "./pages/Documents/DocumentDetailPage";
@@ -74,6 +75,9 @@ const AppRoutes = () => (
         </PublicRoute>
       }
     />
+    {/* Not gated by PublicRoute/ProtectedRoute — a verification link must
+        work whether or not the clicking browser happens to be logged in. */}
+    <Route path="/verify-email" element={<VerifyEmailPage />} />
 
     <Route
       element={

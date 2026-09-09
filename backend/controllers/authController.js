@@ -4,6 +4,7 @@ import { setRefreshCookie, clearRefreshCookie, readRefreshCookie } from "../util
 import { startRefreshFamily, rotateRefreshToken, revokeFamily, revokeAllForUser } from "../utils/refreshTokenStore.js";
 import { isAdminEmail } from "../utils/adminEmails.js";
 import { createResetToken, consumeResetToken } from "../utils/passwordResetStore.js";
+import { createVerificationToken, consumeVerificationToken } from "../utils/emailVerificationStore.js";
 import { sendMail } from "../utils/mailer.js";
 
 const MAX_FAILED_ATTEMPTS = Number(process.env.ACCOUNT_LOCK_MAX_ATTEMPTS) || 5;
@@ -23,6 +24,19 @@ const issueTokens = async (res, user) => {
 // separate "am I an admin" round trip.
 const withIsAdmin = (user) => ({ ...user.toJSON(), isAdmin: isAdminEmail(user.email) });
 
+// Best-effort: registration succeeds either way. A failed send (or an
+// unconfigured mail provider — see utils/mailer.js) just means the user
+// verifies later via "resend verification email" instead of the initial link.
+const sendVerificationEmail = async (user) => {
+  const token = await createVerificationToken(user._id);
+  const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${token}`;
+  await sendMail({
+    to: user.email,
+    subject: "Verify your email",
+    text: `Welcome! Verify your email to finish setting up your account: ${verifyUrl}\n\nThis link expires in 24 hours.`,
+  });
+};
+
 export const register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
@@ -34,6 +48,7 @@ export const register = async (req, res, next) => {
     }
 
     const user = await User.create({ username, email, password });
+    await sendVerificationEmail(user);
 
     res.status(201).json({
       user: withIsAdmin(user),
@@ -219,6 +234,39 @@ export const resetPassword = async (req, res, next) => {
     await revokeAllForUser(user._id);
 
     res.status(200).json({ message: "Password reset successfully. Please log in." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+
+    const userId = await consumeVerificationToken(token);
+    if (!userId) {
+      res.status(400);
+      throw new Error("Invalid or expired verification link");
+    }
+
+    await User.updateOne({ _id: userId, emailVerifiedAt: null }, { $set: { emailVerifiedAt: new Date() } });
+
+    res.status(200).json({ message: "Email verified" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const resendVerification = async (req, res, next) => {
+  try {
+    if (req.user.emailVerifiedAt) {
+      res.status(400);
+      throw new Error("Email is already verified");
+    }
+
+    await sendVerificationEmail(req.user);
+
+    res.status(200).json({ message: "Verification email sent" });
   } catch (err) {
     next(err);
   }

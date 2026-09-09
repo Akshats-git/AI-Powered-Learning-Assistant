@@ -83,3 +83,30 @@ ${historyText || "(no prior messages)"}
 
 User question: ${question}`;
 };
+
+// The retrieval counterpart to chatPrompt: used once a document has been
+// chunked and hybrid search (utils/hybridRetrieval.js) has picked the
+// excerpts most relevant to this specific question, instead of truncating
+// the document at a fixed character count regardless of what's being asked.
+// The excerpts themselves (with page labels) come from
+// utils/citations.js's buildRetrievedContext — this only owns the
+// instructions wrapped around them.
+export const retrievalChatPrompt = (context, history, question) => {
+  const historyText = (history || [])
+    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+    .join("\n");
+
+  return `You are a helpful study assistant answering a question about a document. Below are the excerpts retrieved as most relevant to this specific question — not the whole document, so other relevant parts may exist that you can't see here.
+
+Answer using ONLY the excerpts below, in markdown. When a claim comes from a specific excerpt, cite its page in parentheses, e.g. "(p. 12)". If the excerpts don't contain the answer, say so explicitly instead of guessing — do not fall back on outside knowledge.
+
+Retrieved excerpts:
+"""
+${context}
+"""
+
+Conversation so far:
+${historyText || "(no prior messages)"}
+
+User question: ${question}`;
+};

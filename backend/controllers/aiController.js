@@ -1,12 +1,17 @@
 import Flashcard from "../models/Flashcard.js";
 import Quiz from "../models/Quiz.js";
 import ChatHistory from "../models/ChatHistory.js";
+import Chunk from "../models/Chunk.js";
 import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { generate } from "../utils/aiClient.js";
 import { withInFlightGuard } from "../utils/inFlightGuard.js";
 import { assertWithinBudget, recordSpend } from "../utils/aiBudget.js";
 import { recordLlmCall } from "../utils/llmLedger.js";
-import { flashcardPrompt, quizPrompt, summaryPrompt, explainPrompt, chatPrompt } from "../utils/prompts.js";
+import { flashcardPrompt, quizPrompt, summaryPrompt, explainPrompt, chatPrompt, retrievalChatPrompt } from "../utils/prompts.js";
+import { hybridSearch } from "../utils/hybridRetrieval.js";
+import { buildRetrievedContext, toSources } from "../utils/citations.js";
+import { embedTexts } from "../utils/embeddings.js";
+import { logger } from "../utils/logger.js";
 
 const CHAT_CONTEXT_SIZE = 10;
 const DIFFICULTIES = ["easy", "medium", "hard"];
@@ -168,6 +173,56 @@ export const explainConcept = async (req, res, next) => {
   }
 };
 
+// Embeds the question (best-effort — a failure here degrades to lexical-only
+// retrieval, it never fails the chat) and records that embedding's spend
+// through the same budget/ledger every other AI call goes through.
+const embedQuery = async (message, { userId, requestId, documentId }) => {
+  if (!process.env.OPENAI_API_KEY) return null;
+
+  try {
+    const batchUsages = [];
+    const [vector] = await embedTexts([message], { onUsage: (usage) => batchUsages.push(usage) });
+    for (const usage of batchUsages) {
+      await recordSpend(userId, usage.costUsd || 0);
+      await recordLlmCall(userId, requestId, "embedding", {
+        model: usage.model,
+        usage: { prompt_tokens: usage.totalTokens, completion_tokens: 0, total_tokens: usage.totalTokens },
+        costUsd: usage.costUsd,
+        latencyMs: usage.latencyMs,
+      });
+    }
+    return vector || null;
+  } catch (err) {
+    logger.error({ err: err.message, documentId }, "Query embedding failed — falling back to lexical-only retrieval");
+    return null;
+  }
+};
+
+// Chooses between retrieval-augmented and whole-document prompting: a
+// document only has Chunk rows once it's been through ingest.js, and hybrid
+// search only has something to fuse once at least one chunk matched the
+// query at all — both fall back to the old truncation-based chatPrompt
+// rather than sending the model an empty excerpt block.
+const buildChatPrompt = async ({ document, message, recentHistory, userId, requestId }) => {
+  const wholeDocumentFallback = () => ({ prompt: chatPrompt(document.extractedText, recentHistory, message), sources: [] });
+
+  const chunks = await Chunk.find({ document: document._id })
+    .select("text page endPage sectionPath embedding")
+    .lean();
+  if (chunks.length === 0) return wholeDocumentFallback();
+
+  const queryEmbedding = await embedQuery(message, { userId, requestId, documentId: document._id });
+
+  const results = hybridSearch({
+    query: message,
+    queryEmbedding,
+    chunks: chunks.map((c) => ({ id: c._id, text: c.text, embedding: c.embedding, page: c.page, endPage: c.endPage, sectionPath: c.sectionPath })),
+  });
+  if (results.length === 0) return wholeDocumentFallback();
+
+  return { prompt: retrievalChatPrompt(buildRetrievedContext(results), recentHistory, message), sources: toSources(results) };
+};
+
 export const chatWithDocument = async (req, res, next) => {
   try {
     const { documentId, message } = req.body;
@@ -178,8 +233,10 @@ export const chatWithDocument = async (req, res, next) => {
     const existingChat = await ChatHistory.findOne({ user: req.user._id, document: document._id });
     const recentHistory = existingChat ? existingChat.messages.slice(-CHAT_CONTEXT_SIZE) : [];
 
+    const { prompt, sources } = await buildChatPrompt({ document, message, recentHistory, userId: req.user._id, requestId: req.id });
+
     let usageInfo = null;
-    const reply = await generate(chatPrompt(document.extractedText, recentHistory, message), {
+    const reply = await generate(prompt, {
       feature: "chat",
       onUsage: (info) => {
         usageInfo = info;
@@ -195,7 +252,7 @@ export const chatWithDocument = async (req, res, next) => {
           messages: {
             $each: [
               { role: "user", content: message },
-              { role: "assistant", content: reply },
+              { role: "assistant", content: reply, ...(sources.length ? { sources } : {}) },
             ],
           },
         },
@@ -203,7 +260,7 @@ export const chatWithDocument = async (req, res, next) => {
       { new: true, upsert: true }
     );
 
-    res.status(200).json({ reply, messages: chat.messages });
+    res.status(200).json({ reply, sources, messages: chat.messages });
   } catch (err) {
     next(err);
   }

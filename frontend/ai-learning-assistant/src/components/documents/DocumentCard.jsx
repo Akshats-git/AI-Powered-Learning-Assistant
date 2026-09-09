@@ -38,6 +38,15 @@ const DocumentCard = ({ document }) => {
             No text
           </span>
         )}
+        {document.fileMissing && (
+          <span
+            title="The original PDF file is no longer on the server — chat/flashcards/quiz still work"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-600 text-xs font-medium"
+          >
+            <AlertTriangle className="w-3 h-3" />
+            File missing
+          </span>
+        )}
       </div>
     </button>
   );

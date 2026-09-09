@@ -69,6 +69,18 @@ const DocumentDetailPage = () => {
         </div>
       )}
 
+      {document.fileMissing && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 mb-6 text-sm text-red-800">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>
+            The original PDF file is no longer available on the server (uploads don't survive a
+            redeploy yet). Chat, summaries, flashcards and quizzes still work — they use text
+            extracted at upload time — but the file preview below won't load. Re-upload the PDF to
+            restore it.
+          </p>
+        </div>
+      )}
+
       <div className="flex gap-6 border-b border-gray-200 mb-6 overflow-x-auto">
         {TABS.map((tab) => (
           <button

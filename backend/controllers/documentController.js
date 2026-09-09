@@ -32,11 +32,26 @@ const extractText = async (filePath) => {
   }
 };
 
-const toDocumentResponse = (doc) => {
+// Render/Railway wipe local disk on every deploy, so a document's Mongo
+// record can outlive its file. Surface that explicitly instead of letting
+// the client discover it as a broken PDF viewer with no explanation — the
+// extracted text (used for chat/flashcards/quiz) lives in Mongo, so those
+// features keep working even when this is true.
+const fileExists = async (filePath) => {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const toDocumentResponse = async (doc) => {
   const { extractedText, ...rest } = doc.toObject();
   return {
     ...rest,
     fileUrl: `/uploads/${doc.fileName}`,
+    fileMissing: !(await fileExists(doc.filePath)),
   };
 };
 
@@ -71,7 +86,7 @@ export const uploadDocument = async (req, res, next) => {
         hasExtractedText: Boolean(extractedText && extractedText.trim()),
       });
 
-      res.status(201).json(toDocumentResponse(document));
+      res.status(201).json(await toDocumentResponse(document));
     } catch (err) {
       // Multer already wrote the file to disk before this handler ran — don't
       // leave it orphaned just because validation or extraction failed after.
@@ -105,12 +120,16 @@ export const listDocuments = async (req, res, next) => {
     const flashcardMap = new Map(flashcardCounts.map((f) => [f._id.toString(), f.count]));
     const quizMap = new Map(quizCounts.map((q) => [q._id.toString(), q.count]));
 
-    res.status(200).json({
-      items: documents.map((doc) => ({
-        ...toDocumentResponse(doc),
+    const items = await Promise.all(
+      documents.map(async (doc) => ({
+        ...(await toDocumentResponse(doc)),
         flashcardCount: flashcardMap.get(doc._id.toString()) || 0,
         quizCount: quizMap.get(doc._id.toString()) || 0,
-      })),
+      }))
+    );
+
+    res.status(200).json({
+      items,
       ...buildPageMeta(page, limit, total),
     });
   } catch (err) {
@@ -126,7 +145,7 @@ export const getDocument = async (req, res, next) => {
     await Document.updateOne({ _id: document._id }, { $set: { lastAccessedAt } });
     document.lastAccessedAt = lastAccessedAt;
 
-    res.status(200).json(toDocumentResponse(document));
+    res.status(200).json(await toDocumentResponse(document));
   } catch (err) {
     next(err);
   }

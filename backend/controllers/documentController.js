@@ -6,6 +6,8 @@ import Quiz from "../models/Quiz.js";
 import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 import { buildPageMap } from "../utils/pageMap.js";
+import { ingestDocument } from "../utils/ingest.js";
+import { logger } from "../utils/logger.js";
 
 // A browser-set mimetype is trivially spoofed (rename a .exe to .pdf), so
 // confirm the actual bytes before trusting an upload as a PDF.
@@ -94,6 +96,16 @@ export const uploadDocument = async (req, res, next) => {
         pageCount: pageMap.length,
         pageMap,
       });
+
+      // Best-effort: chunking/embedding failing shouldn't fail an otherwise
+      // successful upload. The document is still fully usable through the
+      // existing truncation-based prompts either way — this only affects
+      // whether hybrid retrieval has anything indexed for it yet.
+      try {
+        await ingestDocument(document, { requestId: req.id });
+      } catch (err) {
+        logger.error({ err: err.message, documentId: document._id }, "Ingest failed after upload");
+      }
 
       res.status(201).json(await toDocumentResponse(document));
     } catch (err) {

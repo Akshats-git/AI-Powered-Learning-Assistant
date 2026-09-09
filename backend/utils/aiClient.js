@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger.js";
+import { modelForFeature } from "./modelRouting.js";
 
 let client;
 
@@ -37,7 +38,9 @@ export const estimateCostUsd = (model, usage) => {
 };
 
 export const generate = async (prompt, { json = false, feature = "unknown", onUsage } = {}) => {
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  // Per-feature routing (utils/modelRouting.js) — quiz generation gets the
+  // stronger model, everything else defaults to the cheap one.
+  const model = modelForFeature(feature);
   const startedAt = Date.now();
 
   let response;

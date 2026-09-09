@@ -119,6 +119,26 @@ Then open `http://localhost:5173`, register an account, and upload a PDF.
 | `frontend/ai-learning-assistant/` | `npm run dev` | Start the Vite dev server |
 | `frontend/ai-learning-assistant/` | `npm run build` | Production build to `dist/` |
 | `frontend/ai-learning-assistant/` | `npm run lint` | Run ESLint |
+| `backend/` | `npm run compare-schedulers` | Regenerate `docs/scheduler-comparison.md` (SM-2 vs. FSRS) |
+
+## Spaced repetition: SM-2 vs. FSRS
+
+Flashcard review replaced a binary "reviewed" flag with real scheduling:
+grade a card Again/Hard/Good/Easy (`1`-`4` on the keyboard) and
+[`backend/utils/fsrs.js`](backend/utils/fsrs.js) computes its next due date
+from an explicit stability/difficulty model, not a fixed multiplier. Every
+grade is also written to an immutable `ReviewLog`
+([`backend/models/ReviewLog.js`](backend/models/ReviewLog.js)).
+[`backend/utils/sm2.js`](backend/utils/sm2.js) implements the older SM-2
+algorithm alongside it as the documented baseline the comparison below
+measures FSRS against. `GET /api/review/due` is the unified due queue —
+everything due today across every document, interleaved — with a session UI
+at `/review`.
+
+**[docs/scheduler-comparison.md](docs/scheduler-comparison.md)** has the
+actual numbers from a synthetic-learner simulation (this app has no real
+review history yet to replay — see the file for exactly what the simulation
+does and doesn't prove). Regenerate it with `npm run compare-schedulers`.
 
 ## Notes
 

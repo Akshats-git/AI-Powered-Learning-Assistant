@@ -14,6 +14,7 @@ import DocumentListPage from "./pages/Documents/DocumentListPage";
 import DocumentDetailPage from "./pages/Documents/DocumentDetailPage";
 import FlashcardPage from "./pages/Flashcards/FlashcardPage";
 import FlashcardsListPage from "./pages/Flashcards/FlashcardsListPage";
+import QuizzesListPage from "./pages/Quizzes/QuizzesListPage";
 import QuizTakePage from "./pages/Quizzes/QuizTakePage";
 import QuizResultPage from "./pages/Quizzes/QuizResultPage";
 import ProfilePage from "./pages/Profile/ProfilePage";
@@ -66,6 +67,7 @@ const AppRoutes = () => (
       <Route path="/documents/:id" element={<DocumentDetailPage />} />
       <Route path="/documents/:id/flashcards" element={<FlashcardPage />} />
       <Route path="/flashcards" element={<FlashcardsListPage />} />
+      <Route path="/quizzes" element={<QuizzesListPage />} />
       <Route path="/quizzes/:id" element={<QuizTakePage />} />
       <Route path="/quizzes/:id/results" element={<QuizResultPage />} />
       <Route path="/profile" element={<ProfilePage />} />

@@ -1,7 +1,7 @@
 import axiosInstance from "../utils/axiosInstance";
 import { API_PATHS } from "../utils/apiPaths";
 
-export const listQuizzes = () => axiosInstance.get(API_PATHS.QUIZZES.LIST);
+export const listQuizzes = (params) => axiosInstance.get(API_PATHS.QUIZZES.LIST, { params });
 
 export const listQuizzesForDocument = (documentId) =>
   axiosInstance.get(API_PATHS.QUIZZES.LIST_FOR_DOCUMENT(documentId));

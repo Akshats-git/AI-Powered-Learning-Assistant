@@ -1,5 +1,6 @@
 import Quiz from "../models/Quiz.js";
 import QuizAttempt from "../models/QuizAttempt.js";
+import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 
 const findOwnedQuiz = async (quizId, userId) => {
   const quiz = await Quiz.findOne({ _id: quizId, user: userId });
@@ -23,10 +24,29 @@ const ANSWER_KEY_EXCLUDE = "-questions.correctAnswer -questions.explanation";
 
 export const listQuizzes = async (req, res, next) => {
   try {
-    const quizzes = await Quiz.find({ user: req.user._id })
-      .select(ANSWER_KEY_EXCLUDE)
-      .sort({ createdAt: -1 });
-    res.status(200).json(quizzes);
+    const { page, limit, skip } = parsePagination(req.query);
+
+    const [quizzes, total] = await Promise.all([
+      Quiz.find({ user: req.user._id })
+        .select("title isCompleted score completedAt createdAt document questions")
+        .populate("document", "title")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Quiz.countDocuments({ user: req.user._id }),
+    ]);
+
+    // The list view never needs question text (or the answer key riding
+    // along inside it) — just how many there are.
+    const items = quizzes.map((quiz) => {
+      const { questions, ...rest } = quiz.toObject();
+      return { ...rest, questionCount: questions.length };
+    });
+
+    res.status(200).json({
+      items,
+      ...buildPageMeta(page, limit, total),
+    });
   } catch (err) {
     next(err);
   }

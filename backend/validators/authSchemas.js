@@ -22,3 +22,16 @@ export const updatePasswordSchema = requestSchema({
     newPassword: z.string().min(6, "New password must be at least 6 characters"),
   }),
 });
+
+export const forgotPasswordSchema = requestSchema({
+  body: z.object({
+    email: z.string().trim().toLowerCase().email("A valid email is required"),
+  }),
+});
+
+export const resetPasswordSchema = requestSchema({
+  body: z.object({
+    token: z.string().min(1, "Reset token is required"),
+    newPassword: z.string().min(6, "New password must be at least 6 characters"),
+  }),
+});

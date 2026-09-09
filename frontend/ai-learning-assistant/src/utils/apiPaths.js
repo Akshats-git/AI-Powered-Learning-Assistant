@@ -6,6 +6,8 @@ export const API_PATHS = {
     LOGOUT: "/api/auth/logout",
     PROFILE: "/api/auth/profile",
     UPDATE_PASSWORD: "/api/auth/update-password",
+    FORGOT_PASSWORD: "/api/auth/forgot-password",
+    RESET_PASSWORD: "/api/auth/reset-password",
   },
   DOCUMENTS: {
     UPLOAD: "/api/documents/upload",

@@ -1,8 +1,10 @@
 import User from "../models/User.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utils/generateToken.js";
 import { setRefreshCookie, clearRefreshCookie, readRefreshCookie } from "../utils/refreshCookie.js";
-import { startRefreshFamily, rotateRefreshToken, revokeFamily } from "../utils/refreshTokenStore.js";
+import { startRefreshFamily, rotateRefreshToken, revokeFamily, revokeAllForUser } from "../utils/refreshTokenStore.js";
 import { isAdminEmail } from "../utils/adminEmails.js";
+import { createResetToken, consumeResetToken } from "../utils/passwordResetStore.js";
+import { sendMail } from "../utils/mailer.js";
 
 const MAX_FAILED_ATTEMPTS = Number(process.env.ACCOUNT_LOCK_MAX_ATTEMPTS) || 5;
 const LOCK_DURATION_MS = (Number(process.env.ACCOUNT_LOCK_MINUTES) || 15) * 60 * 1000;
@@ -166,6 +168,57 @@ export const logout = async (req, res, next) => {
 export const getProfile = async (req, res, next) => {
   try {
     res.status(200).json({ user: withIsAdmin(req.user) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    // Identical response whether or not the account exists — the same
+    // anti-enumeration posture as login (see the comment there). Only send
+    // mail, and only issue a token, when there's actually a user to reset.
+    if (user) {
+      const token = await createResetToken(user._id);
+      const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
+      await sendMail({
+        to: user.email,
+        subject: "Reset your password",
+        text: `We received a request to reset your password.\n\nReset it here: ${resetUrl}\n\nThis link expires in 1 hour and can only be used once. If you didn't request this, you can ignore this email.`,
+      });
+    }
+
+    res.status(200).json({ message: "If that email is registered, a reset link has been sent." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    const userId = await consumeResetToken(token);
+    const user = userId ? await User.findById(userId) : null;
+    if (!user) {
+      res.status(400);
+      throw new Error("Invalid or expired reset link");
+    }
+
+    user.password = newPassword;
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
+
+    // A password reset should end every existing session, not just the
+    // request that triggered it — otherwise a device an attacker was
+    // already using stays logged in straight through the "fix."
+    await revokeAllForUser(user._id);
+
+    res.status(200).json({ message: "Password reset successfully. Please log in." });
   } catch (err) {
     next(err);
   }

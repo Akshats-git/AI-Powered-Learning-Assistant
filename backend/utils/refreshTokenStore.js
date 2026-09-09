@@ -45,3 +45,6 @@ export const rotateRefreshToken = async (presentedJti, userId) => {
 
 /** Revokes every not-already-revoked token in a family — logout, or a future "log out everywhere." */
 export const revokeFamily = (familyId) => RefreshToken.updateMany({ familyId, revokedAt: null }, { $set: { revokedAt: new Date() } });
+
+/** Revokes every not-already-revoked token for a user, across every family — a password reset should end every existing session, not just the request that triggered it. */
+export const revokeAllForUser = (userId) => RefreshToken.updateMany({ user: userId, revokedAt: null }, { $set: { revokedAt: new Date() } });

@@ -3,7 +3,7 @@ import { generateAccessToken } from "../utils/generateToken.js";
 
 let counter = 0;
 
-// Creates a real, saved user (so bcrypt hashing and toJSON stripping are
+// Creates a real, saved user (so password hashing and toJSON stripping are
 // exercised too) and a token for it, ready to drop into an Authorization header.
 export const createUserWithToken = async (overrides = {}) => {
   counter += 1;

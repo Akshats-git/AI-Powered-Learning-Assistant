@@ -70,6 +70,11 @@ export const login = async (req, res, next) => {
 
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
+    // The only moment a still-bcrypt-hashed password can be upgraded to
+    // argon2id: the plaintext only ever exists in memory, right here, right
+    // after it's just been verified. Setting `password` re-triggers the
+    // model's pre-save hashing hook.
+    if (user.needsPasswordRehash()) user.password = password;
     await user.save();
 
     res.status(200).json({

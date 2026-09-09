@@ -63,3 +63,33 @@ describe("auth", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("password hash migration (bcrypt → argon2id)", () => {
+  it("logs in successfully against a legacy bcrypt hash, then transparently upgrades it to argon2id", async () => {
+    const bcrypt = (await import("bcryptjs")).default;
+    const { default: User } = await import("../models/User.js");
+
+    const bcryptHash = await bcrypt.hash("legacy-password-123", 10);
+    // Bypass the model's pre-save hashing hook to plant a hash exactly the
+    // way an account created before this migration shipped would have one.
+    await User.collection.insertOne({
+      username: "Legacy User",
+      email: "legacy@example.com",
+      password: bcryptHash,
+      failedLoginAttempts: 0,
+      lockUntil: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const loginRes = await request(app).post("/api/auth/login").send({ email: "legacy@example.com", password: "legacy-password-123" });
+    expect(loginRes.status).toBe(200);
+
+    const stored = await User.findOne({ email: "legacy@example.com" });
+    expect(stored.password).toMatch(/^\$argon2id\$/);
+
+    // And the upgraded hash still logs in correctly afterward.
+    const secondLogin = await request(app).post("/api/auth/login").send({ email: "legacy@example.com", password: "legacy-password-123" });
+    expect(secondLogin.status).toBe(200);
+  });
+});

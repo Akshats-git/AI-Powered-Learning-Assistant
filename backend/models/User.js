@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
+import { hashPassword, verifyPassword, needsRehash } from "../utils/passwordHashing.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -18,12 +18,22 @@ const userSchema = new mongoose.Schema(
 
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  this.password = await hashPassword(this.password);
 });
 
+// Verifies against whichever algorithm actually produced this user's stored
+// hash — see utils/passwordHashing.js for why that's bcrypt for some users
+// and argon2id for others during the migration window.
 userSchema.methods.comparePassword = function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  return verifyPassword(this.password, candidatePassword);
+};
+
+// True once for every pre-argon2id account, on whatever login first
+// verifies successfully against their bcrypt hash — see authController.js's
+// login handler, the only place this can be acted on (it needs the
+// plaintext password, which only exists in memory at that moment).
+userSchema.methods.needsPasswordRehash = function () {
+  return needsRehash(this.password);
 };
 
 userSchema.set("toJSON", {

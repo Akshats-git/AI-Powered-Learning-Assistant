@@ -23,7 +23,8 @@ features.
 lucide-react, react-hot-toast, moment, react-markdown + remark-gfm +
 react-syntax-highlighter.
 
-**Backend:** Node.js, Express 5, MongoDB + Mongoose, JWT auth, bcryptjs,
+**Backend:** Node.js, Express 5, MongoDB + Mongoose, JWT auth, argon2id
+password hashing (bcryptjs kept only to verify pre-migration hashes),
 multer (uploads), pdf-parse (text extraction), the OpenAI API for AI
 generation, helmet + compression + express-rate-limit for hardening.
 

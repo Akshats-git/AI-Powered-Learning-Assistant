@@ -40,6 +40,9 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setUser(null);
+    // Best-effort: clears the httpOnly refresh cookie server-side. Local
+    // state is already cleared above regardless of whether this succeeds.
+    authService.logout().catch(() => {});
   };
 
   const updateUser = (updates) => {

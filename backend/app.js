@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
+import cookieParser from "cookie-parser";
 
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 import { requestId } from "./middlewares/requestId.js";
@@ -30,6 +31,7 @@ app.use(
 app.use(compression());
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(
   "/uploads",
   (req, res, next) => {

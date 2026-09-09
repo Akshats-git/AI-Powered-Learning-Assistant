@@ -6,7 +6,8 @@ import { beforeAll, afterAll, afterEach } from "vitest";
 // read these from process.env at module-load time.
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET ||= "test-secret-do-not-use-in-production";
-process.env.JWT_EXPIRES_IN ||= "1h";
+process.env.JWT_ACCESS_EXPIRES_IN ||= "1h";
+process.env.JWT_REFRESH_EXPIRES_IN ||= "7d";
 process.env.CLIENT_URL ||= "http://localhost:5173";
 
 let mongod;

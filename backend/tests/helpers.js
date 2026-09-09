@@ -1,5 +1,5 @@
 import User from "../models/User.js";
-import { generateToken } from "../utils/generateToken.js";
+import { generateAccessToken } from "../utils/generateToken.js";
 
 let counter = 0;
 
@@ -12,5 +12,5 @@ export const createUserWithToken = async (overrides = {}) => {
     email: overrides.email || `user-${counter}@example.com`,
     password: overrides.password || "password123",
   });
-  return { user, token: generateToken(user._id) };
+  return { user, token: generateAccessToken(user._id) };
 };

@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema(
       month: { type: String, default: "" }, // "YYYY-MM"; resets the counter when it changes
       spendUsd: { type: Number, default: 0 },
     },
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -27,6 +29,8 @@ userSchema.methods.comparePassword = function (candidatePassword) {
 userSchema.set("toJSON", {
   transform: (doc, ret) => {
     delete ret.password;
+    delete ret.failedLoginAttempts;
+    delete ret.lockUntil;
     return ret;
   },
 });

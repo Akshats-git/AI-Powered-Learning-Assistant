@@ -84,13 +84,50 @@ ${historyText || "(no prior messages)"}
 User question: ${question}`;
 };
 
-// The retrieval counterpart to chatPrompt: used once a document has been
-// chunked and hybrid search (utils/hybridRetrieval.js) has picked the
-// excerpts most relevant to this specific question, instead of truncating
-// the document at a fixed character count regardless of what's being asked.
-// The excerpts themselves (with page labels) come from
-// utils/citations.js's buildRetrievedContext — this only owns the
-// instructions wrapped around them.
+// The retrieval counterparts to flashcardPrompt/quizPrompt/summaryPrompt/
+// explainPrompt below, and to chatPrompt further down: used once a document
+// has been chunked. Generation has no user question to retrieve against
+// (unlike chat), so instead of hybrid search picking the most relevant
+// chunks, utils/contextSelection.js samples chunks evenly across the whole
+// document — coverage, not relevance — so a long document's back half is
+// represented instead of silently cut off. The excerpts themselves (with
+// page labels) come from utils/citations.js's buildRetrievedContext; these
+// functions only own the instructions wrapped around them.
+
+export const retrievalFlashcardPrompt = (context, count) => `You are an expert study assistant. Below are excerpts sampled across the whole document (not the raw document text) so you have coverage from the beginning, middle, and end even for a long document. Based on them, generate ${count} flashcards that test understanding of the key concepts.
+
+Respond with ONLY valid JSON in this exact shape, no markdown fences, no extra text:
+{"flashcards": [{"question": "string", "answer": "string", "difficulty": "easy" | "medium" | "hard"}]}
+
+Document excerpts:
+"""
+${context}
+"""`;
+
+export const retrievalQuizPrompt = (context, count) => `You are an expert exam writer. Below are excerpts sampled across the whole document (not the raw document text) so you have coverage from the beginning, middle, and end even for a long document. Based on them, generate ${count} multiple-choice quiz questions, each with exactly 4 options and one correct answer.
+
+Respond with ONLY valid JSON in this exact shape, no markdown fences, no extra text:
+{"questions": [{"question": "string", "options": ["string", "string", "string", "string"], "correctAnswer": "string", "explanation": "string"}]}
+
+Document excerpts:
+"""
+${context}
+"""`;
+
+export const retrievalSummaryPrompt = (context) => `Summarize the following document excerpts in clear, well-structured markdown (use headings and bullet points where useful). The excerpts were sampled across the whole document rather than including it in full, so mention in one closing line that the summary is based on a sampled excerpt of the document, not the complete text.
+
+Document excerpts:
+"""
+${context}
+"""`;
+
+export const retrievalExplainPrompt = (context, concept) => `Using the following document excerpts as context, explain the concept "${concept}" in clear, well-structured markdown. The excerpts were sampled across the whole document rather than including it in full — if the concept isn't covered by them, say so explicitly and give a general explanation instead of guessing.
+
+Document excerpts:
+"""
+${context}
+"""`;
+
 export const retrievalChatPrompt = (context, history, question) => {
   const historyText = (history || [])
     .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)

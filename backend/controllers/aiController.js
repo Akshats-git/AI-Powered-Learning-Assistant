@@ -7,9 +7,21 @@ import { generate } from "../utils/aiClient.js";
 import { withInFlightGuard } from "../utils/inFlightGuard.js";
 import { assertWithinBudget, recordSpend } from "../utils/aiBudget.js";
 import { recordLlmCall } from "../utils/llmLedger.js";
-import { flashcardPrompt, quizPrompt, summaryPrompt, explainPrompt, chatPrompt, retrievalChatPrompt } from "../utils/prompts.js";
+import {
+  flashcardPrompt,
+  quizPrompt,
+  summaryPrompt,
+  explainPrompt,
+  chatPrompt,
+  retrievalFlashcardPrompt,
+  retrievalQuizPrompt,
+  retrievalSummaryPrompt,
+  retrievalExplainPrompt,
+  retrievalChatPrompt,
+} from "../utils/prompts.js";
 import { hybridSearch } from "../utils/hybridRetrieval.js";
 import { buildRetrievedContext, toSources } from "../utils/citations.js";
+import { selectChunksForBudget } from "../utils/contextSelection.js";
 import { embedTexts } from "../utils/embeddings.js";
 import { logger } from "../utils/logger.js";
 
@@ -26,6 +38,26 @@ const assertHasText = (document) => {
   }
 };
 
+// Flashcards/quiz/summary/explain have no user question to retrieve
+// against (unlike chat), so once a document has been chunked, the context
+// they get is chunks sampled for *coverage* across the whole document
+// (utils/contextSelection.js) rather than a blind head slice — a long
+// document's back half is represented instead of silently cut off. Falls
+// back to the raw extracted text for a document that hasn't been chunked
+// yet (ingest failed, or predates the Chunk model), same as chat does.
+const buildGenerationContext = async (document) => {
+  const chunks = await Chunk.find({ document: document._id })
+    .select("text page endPage sectionPath")
+    .sort({ index: 1 })
+    .lean();
+
+  if (chunks.length === 0) {
+    return { context: document.extractedText, retrieved: false };
+  }
+
+  return { context: buildRetrievedContext(selectChunksForBudget(chunks)), retrieved: true };
+};
+
 export const generateFlashcards = async (req, res, next) => {
   try {
     const { documentId, count } = req.body;
@@ -34,10 +66,12 @@ export const generateFlashcards = async (req, res, next) => {
     await assertWithinBudget(req.user._id);
 
     const cardCount = clampCount(count, 10, 30);
+    const { context, retrieved } = await buildGenerationContext(document);
+    const prompt = retrieved ? retrievalFlashcardPrompt(context, cardCount) : flashcardPrompt(context, cardCount);
 
     const flashcardSet = await withInFlightGuard(`${req.user._id}:${documentId}:flashcards`, async () => {
       let usageInfo = null;
-      const result = await generate(flashcardPrompt(document.extractedText, cardCount), {
+      const result = await generate(prompt, {
         json: true,
         feature: "flashcards",
         onUsage: (info) => {
@@ -81,10 +115,12 @@ export const generateQuiz = async (req, res, next) => {
     await assertWithinBudget(req.user._id);
 
     const questionCount = clampCount(numQuestions, 5, 20);
+    const { context, retrieved } = await buildGenerationContext(document);
+    const prompt = retrieved ? retrievalQuizPrompt(context, questionCount) : quizPrompt(context, questionCount);
 
     const quiz = await withInFlightGuard(`${req.user._id}:${documentId}:quiz`, async () => {
       let usageInfo = null;
-      const result = await generate(quizPrompt(document.extractedText, questionCount), {
+      const result = await generate(prompt, {
         json: true,
         feature: "quiz",
         onUsage: (info) => {
@@ -128,9 +164,12 @@ export const generateSummary = async (req, res, next) => {
     assertHasText(document);
     await assertWithinBudget(req.user._id);
 
+    const { context, retrieved } = await buildGenerationContext(document);
+    const prompt = retrieved ? retrievalSummaryPrompt(context) : summaryPrompt(context);
+
     const summary = await withInFlightGuard(`${req.user._id}:${documentId}:summary`, async () => {
       let usageInfo = null;
-      const result = await generate(summaryPrompt(document.extractedText), {
+      const result = await generate(prompt, {
         feature: "summary",
         onUsage: (info) => {
           usageInfo = info;
@@ -154,9 +193,12 @@ export const explainConcept = async (req, res, next) => {
     assertHasText(document);
     await assertWithinBudget(req.user._id);
 
+    const { context, retrieved } = await buildGenerationContext(document);
+    const prompt = retrieved ? retrievalExplainPrompt(context, concept) : explainPrompt(context, concept);
+
     const explanation = await withInFlightGuard(`${req.user._id}:${documentId}:explain:${concept}`, async () => {
       let usageInfo = null;
-      const result = await generate(explainPrompt(document.extractedText, concept), {
+      const result = await generate(prompt, {
         feature: "explain",
         onUsage: (info) => {
           usageInfo = info;

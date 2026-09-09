@@ -46,4 +46,7 @@ export const API_PATHS = {
   REVIEW: {
     DUE: "/api/review/due",
   },
+  MASTERY: {
+    LIST: "/api/mastery",
+  },
 };

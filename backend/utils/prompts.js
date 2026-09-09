@@ -44,8 +44,10 @@ ${withTruncationNotice(text)}
 
 export const quizPrompt = (text, count) => `You are an expert exam writer. Based on the following document content, generate ${count} multiple-choice quiz questions, each with exactly 4 options and one correct answer.
 
+Also tag each question with the single concept it primarily tests (a short phrase, e.g. "backpropagation" or "eigenvalue decomposition") — reuse the exact same concept phrase across questions that test the same underlying idea, so answers to different questions can be tracked as evidence about the same concept.
+
 Respond with ONLY valid JSON in this exact shape, no markdown fences, no extra text:
-{"questions": [{"question": "string", "options": ["string", "string", "string", "string"], "correctAnswer": "string", "explanation": "string"}]}
+{"questions": [{"question": "string", "options": ["string", "string", "string", "string"], "correctAnswer": "string", "explanation": "string", "concept": "string"}]}
 
 Document content:
 """
@@ -106,8 +108,10 @@ ${context}
 
 export const retrievalQuizPrompt = (context, count) => `You are an expert exam writer. Below are excerpts sampled across the whole document (not the raw document text) so you have coverage from the beginning, middle, and end even for a long document. Based on them, generate ${count} multiple-choice quiz questions, each with exactly 4 options and one correct answer.
 
+Also tag each question with the single concept it primarily tests (a short phrase, e.g. "backpropagation" or "eigenvalue decomposition") — reuse the exact same concept phrase across questions that test the same underlying idea, so answers to different questions can be tracked as evidence about the same concept.
+
 Respond with ONLY valid JSON in this exact shape, no markdown fences, no extra text:
-{"questions": [{"question": "string", "options": ["string", "string", "string", "string"], "correctAnswer": "string", "explanation": "string"}]}
+{"questions": [{"question": "string", "options": ["string", "string", "string", "string"], "correctAnswer": "string", "explanation": "string", "concept": "string"}]}
 
 Document excerpts:
 """

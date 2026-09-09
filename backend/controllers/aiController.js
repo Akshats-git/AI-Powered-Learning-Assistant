@@ -149,6 +149,7 @@ export const generateQuiz = async (req, res, next) => {
         options: q.options,
         correctAnswer: q.correctAnswer,
         explanation: q.explanation || "",
+        concept: typeof q.concept === "string" && q.concept.trim() ? q.concept.trim() : null,
       }));
 
       return Quiz.create({

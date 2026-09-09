@@ -1,6 +1,7 @@
 import Quiz from "../models/Quiz.js";
 import QuizAttempt from "../models/QuizAttempt.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
+import { recordQuizMastery } from "../utils/masteryTracking.js";
 
 const findOwnedQuiz = async (quizId, userId) => {
   const quiz = await Quiz.findOne({ _id: quizId, user: userId });
@@ -125,6 +126,14 @@ export const submitQuiz = async (req, res, next) => {
       correct,
       score,
     });
+
+    // Best-effort: a mastery-tracking failure shouldn't fail an otherwise
+    // successful submission — the score is already saved either way.
+    try {
+      await recordQuizMastery({ userId: req.user._id, documentId: quiz.document, questions: quiz.questions, answerByQuestionId });
+    } catch {
+      // swallow — mastery is a secondary signal, not part of grading itself
+    }
 
     res.status(200).json({
       total,

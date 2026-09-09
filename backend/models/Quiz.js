@@ -6,6 +6,12 @@ const questionSchema = new mongoose.Schema(
     options: { type: [String], required: true },
     correctAnswer: { type: String, required: true },
     explanation: { type: String, default: "" },
+    // The concept this question tests, as tagged by the generation prompt
+    // (utils/prompts.js) — the key a correct/incorrect answer here feeds
+    // into that concept's BKT mastery estimate (models/Mastery.js). `null`
+    // when the model didn't tag one; that question just isn't counted
+    // toward any concept's mastery.
+    concept: { type: String, default: null },
   },
   { _id: true }
 );

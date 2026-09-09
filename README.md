@@ -156,10 +156,12 @@ does and doesn't prove). Regenerate it with `npm run compare-schedulers`.
   or password" response so neither leaks which emails are registered.
 - Auth uses a short-lived (15 min) access token returned in the response body
   plus a 7-day refresh token in an httpOnly cookie; `POST /api/auth/refresh`
-  rotates both. A stolen access token is only useful for minutes; the refresh
-  token never touches JavaScript-readable storage. There's no server-side
-  revocation list yet, so a compromised refresh token is still valid until it
-  expires — full rotation-with-reuse-detection is still open (Phase 31).
+  rotates both and checks a server-side record
+  ([`models/RefreshToken.js`](backend/models/RefreshToken.js)) for reuse —
+  replaying an already-rotated-away token revokes every token descended from
+  that login, not just the one that got reused. Logout revokes it too, not
+  just the browser cookie. A stolen access token is only useful for minutes;
+  the refresh token never touches JavaScript-readable storage.
 - Uploaded files are stored on local disk under `backend/uploads/`. For a
   production deploy with an ephemeral filesystem, swap in S3 or Cloudinary —
   until then, a document whose file was wiped by a redeploy shows a "file no

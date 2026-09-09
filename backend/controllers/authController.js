@@ -1,13 +1,18 @@
 import User from "../models/User.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utils/generateToken.js";
 import { setRefreshCookie, clearRefreshCookie, readRefreshCookie } from "../utils/refreshCookie.js";
+import { startRefreshFamily, rotateRefreshToken, revokeFamily } from "../utils/refreshTokenStore.js";
 import { isAdminEmail } from "../utils/adminEmails.js";
 
 const MAX_FAILED_ATTEMPTS = Number(process.env.ACCOUNT_LOCK_MAX_ATTEMPTS) || 5;
 const LOCK_DURATION_MS = (Number(process.env.ACCOUNT_LOCK_MINUTES) || 15) * 60 * 1000;
 
-const issueTokens = (res, user) => {
-  setRefreshCookie(res, generateRefreshToken(user._id));
+// Starts a brand-new rotation family (utils/refreshTokenStore.js) — every
+// login/register is the start of a chain of refresh tokens that reuse
+// detection can later revoke as a unit.
+const issueTokens = async (res, user) => {
+  const { jti, familyId } = await startRefreshFamily(user._id);
+  setRefreshCookie(res, generateRefreshToken(user._id, jti, familyId));
   return generateAccessToken(user._id);
 };
 
@@ -30,7 +35,7 @@ export const register = async (req, res, next) => {
 
     res.status(201).json({
       user: withIsAdmin(user),
-      token: issueTokens(res, user),
+      token: await issueTokens(res, user),
     });
   } catch (err) {
     next(err);
@@ -79,7 +84,7 @@ export const login = async (req, res, next) => {
 
     res.status(200).json({
       user: withIsAdmin(user),
-      token: issueTokens(res, user),
+      token: await issueTokens(res, user),
     });
   } catch (err) {
     next(err);
@@ -113,9 +118,24 @@ export const refresh = async (req, res, next) => {
       throw new Error("Not authorized, user not found");
     }
 
-    // Rotate on every use: the cookie the client walks away with is always
-    // fresh, which shrinks the window a stolen refresh token is useful for.
-    res.status(200).json({ token: issueTokens(res, user) });
+    // Rotate on every use, and check the server-side record for reuse
+    // (utils/refreshTokenStore.js) — this is what a signature check alone
+    // can never catch: whether *this exact token* was already exchanged for
+    // a newer one. A replay revokes the whole family, not just this token —
+    // once one token from a chain has been reused, none of them can be trusted.
+    const rotation = await rotateRefreshToken(decoded.jti, user._id);
+    if (!rotation.ok) {
+      clearRefreshCookie(res);
+      res.status(401);
+      throw new Error(
+        rotation.reason === "reused"
+          ? "Refresh token reuse detected. All sessions on this account have been signed out — please log in again."
+          : "Not authorized, invalid refresh token"
+      );
+    }
+
+    setRefreshCookie(res, generateRefreshToken(user._id, rotation.jti, rotation.familyId));
+    res.status(200).json({ token: generateAccessToken(user._id) });
   } catch (err) {
     next(err);
   }
@@ -123,6 +143,19 @@ export const refresh = async (req, res, next) => {
 
 export const logout = async (req, res, next) => {
   try {
+    const token = readRefreshCookie(req);
+    if (token) {
+      // Revoke server-side too, not just the browser cookie — otherwise a
+      // refresh token copied out via XSS before logout would keep working
+      // for up to its full 7-day life even after the user "logged out."
+      try {
+        const decoded = verifyRefreshToken(token);
+        if (decoded.familyId) await revokeFamily(decoded.familyId);
+      } catch {
+        // Already invalid/expired — nothing to revoke.
+      }
+    }
+
     clearRefreshCookie(res);
     res.status(200).json({ message: "Logged out" });
   } catch (err) {

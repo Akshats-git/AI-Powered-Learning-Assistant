@@ -11,8 +11,14 @@ export const generateAccessToken = (id) => {
   });
 };
 
-export const generateRefreshToken = (id) => {
-  return jwt.sign({ id, type: "refresh" }, process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET, {
+// jti/familyId are what let a refresh token's use be tracked server-side
+// (utils/refreshTokenStore.js) — a signature alone can prove a token is
+// genuine, but not whether *this specific token* has already been rotated
+// away and is now being replayed. Always supplied by the caller (never
+// generated here) so the JWT's claims and the server-side RefreshToken row
+// they're checked against can never drift apart.
+export const generateRefreshToken = (id, jti, familyId) => {
+  return jwt.sign({ id, type: "refresh", jti, familyId }, process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
   });
 };

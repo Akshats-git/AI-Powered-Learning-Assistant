@@ -33,6 +33,7 @@ vi.mock("../utils/aiClient.js", async (importOriginal) => {
         const winnerIndex = Number(winner[1]);
         return { scores: Array.from({ length: 20 }, (_, i) => ({ index: i, score: i === winnerIndex ? 10 : 1 })) };
       }
+      if (opts?.feature === "query-rewrite") return generate.rewriteResponse ?? prompt;
       generate.lastPrompt = prompt;
       return "Mocked answer.";
     }),
@@ -76,6 +77,7 @@ const makeChunk = (documentId, userId, overrides = {}) =>
 beforeEach(() => {
   generate.mockClear();
   embedTexts.mockClear();
+  generate.rewriteResponse = undefined;
 });
 
 afterEach(() => {
@@ -206,5 +208,40 @@ describe("POST /api/ai/chat — retrieval wiring", () => {
     expect(res.status).toBe(200);
     expect(res.body.sources).toHaveLength(6);
     expect(res.body.sources[0].snippet).toContain("UNIQUE_RERANK_WINNER");
+  });
+
+  it("rewrites an ambiguous follow-up before retrieval, so it can find a chunk the raw question shares no words with", async () => {
+    process.env.OPENAI_API_KEY = "sk-test";
+    const { user, token } = await createUserWithToken();
+    const document = await makeDocument(user._id);
+    await makeChunk(document._id, user._id, {
+      text: "Chloroplasts convert sunlight into chemical energy through photosynthesis.",
+      page: 7,
+    });
+
+    // Seed prior chat history so this request is a follow-up, not a first
+    // message — rewriteQuery only ever runs once there's history to resolve
+    // "the second one" against.
+    await ChatHistory.create({
+      user: user._id,
+      document: document._id,
+      messages: [
+        { role: "user", content: "What organelles are covered in this document?" },
+        { role: "assistant", content: "Mitochondria and chloroplasts, among others." },
+      ],
+    });
+
+    generate.rewriteResponse = "What do chloroplasts do?";
+
+    const res = await request(app)
+      .post("/api/ai/chat")
+      .set("Authorization", `Bearer ${token}`)
+      // Shares zero words with the chunk's text — without rewriting, hybrid
+      // search finds nothing and this would fall back to the whole document.
+      .send({ documentId: document._id.toString(), message: "What does the second one do?" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sources.length).toBeGreaterThan(0);
+    expect(res.body.sources[0].page).toBe(7);
   });
 });

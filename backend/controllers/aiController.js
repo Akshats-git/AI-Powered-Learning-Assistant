@@ -25,6 +25,7 @@ import { selectChunksForBudget } from "../utils/contextSelection.js";
 import { embedTexts } from "../utils/embeddings.js";
 import { rerankChunks } from "../utils/rerank.js";
 import { verifyGroundedness } from "../utils/groundedness.js";
+import { rewriteQuery } from "../utils/queryRewrite.js";
 import { logger } from "../utils/logger.js";
 
 // Wider than the final answer set (DEFAULT_RESULT_LIMIT) on purpose — RRF
@@ -260,17 +261,21 @@ const buildChatPrompt = async ({ document, message, recentHistory, userId, reque
     .lean();
   if (chunks.length === 0) return wholeDocumentFallback();
 
-  const queryEmbedding = await embedQuery(message, { userId, requestId, documentId: document._id });
+  // "What about the second one?" is unembeddable on its own — resolve it
+  // against the conversation before it's used for retrieval. The model still
+  // answers `message` verbatim below; only search uses the rewritten form.
+  const searchQuery = await rewriteQuery({ history: recentHistory, question: message, userId, requestId });
+  const queryEmbedding = await embedQuery(searchQuery, { userId, requestId, documentId: document._id });
 
   const fused = hybridSearch({
-    query: message,
+    query: searchQuery,
     queryEmbedding,
     chunks: chunks.map((c) => ({ id: c._id, text: c.text, embedding: c.embedding, page: c.page, endPage: c.endPage, sectionPath: c.sectionPath })),
     limit: RERANK_CANDIDATE_POOL,
   });
   if (fused.length === 0) return wholeDocumentFallback();
 
-  const results = await rerankChunks({ query: message, candidates: fused, limit: DEFAULT_RESULT_LIMIT, userId, requestId });
+  const results = await rerankChunks({ query: searchQuery, candidates: fused, limit: DEFAULT_RESULT_LIMIT, userId, requestId });
   const retrievedContext = buildRetrievedContext(results);
 
   return { prompt: retrievalChatPrompt(retrievedContext, recentHistory, message), sources: toSources(results), retrievedContext };

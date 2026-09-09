@@ -19,11 +19,17 @@ import {
   retrievalExplainPrompt,
   retrievalChatPrompt,
 } from "../utils/prompts.js";
-import { hybridSearch } from "../utils/hybridRetrieval.js";
+import { hybridSearch, DEFAULT_RESULT_LIMIT } from "../utils/hybridRetrieval.js";
 import { buildRetrievedContext, toSources } from "../utils/citations.js";
 import { selectChunksForBudget } from "../utils/contextSelection.js";
 import { embedTexts } from "../utils/embeddings.js";
+import { rerankChunks } from "../utils/rerank.js";
 import { logger } from "../utils/logger.js";
+
+// Wider than the final answer set (DEFAULT_RESULT_LIMIT) on purpose — RRF
+// fusion is asked for a generous candidate pool, and reranking is what
+// narrows *that* down to the chunks actually worth showing the model.
+const RERANK_CANDIDATE_POOL = 20;
 
 const CHAT_CONTEXT_SIZE = 10;
 const DIFFICULTIES = ["easy", "medium", "hard"];
@@ -255,12 +261,15 @@ const buildChatPrompt = async ({ document, message, recentHistory, userId, reque
 
   const queryEmbedding = await embedQuery(message, { userId, requestId, documentId: document._id });
 
-  const results = hybridSearch({
+  const fused = hybridSearch({
     query: message,
     queryEmbedding,
     chunks: chunks.map((c) => ({ id: c._id, text: c.text, embedding: c.embedding, page: c.page, endPage: c.endPage, sectionPath: c.sectionPath })),
+    limit: RERANK_CANDIDATE_POOL,
   });
-  if (results.length === 0) return wholeDocumentFallback();
+  if (fused.length === 0) return wholeDocumentFallback();
+
+  const results = await rerankChunks({ query: message, candidates: fused, limit: DEFAULT_RESULT_LIMIT, userId, requestId });
 
   return { prompt: retrievalChatPrompt(buildRetrievedContext(results), recentHistory, message), sources: toSources(results) };
 };

@@ -17,7 +17,22 @@ vi.mock("../utils/aiClient.js", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    generate: vi.fn(async (prompt) => {
+    // Reranking (utils/rerank.js) also calls generate(), with feature:
+    // "rerank" and json:true — branch on that so it gets a scores payload
+    // instead of the chat reply, without disturbing lastPrompt tracking for
+    // every other test (rerank only ever runs when there are more matched
+    // chunks than the final result limit, which none of the existing tests
+    // below trigger). RRF fusion reorders candidates by rank, not document
+    // order, so rather than guessing which fused position a given chunk
+    // landed at, find it by reading the rerank prompt itself — it lists each
+    // candidate as "[N] <text>".
+    generate: vi.fn(async (prompt, opts) => {
+      if (opts?.feature === "rerank") {
+        const winner = prompt.match(/\[(\d+)\] UNIQUE_RERANK_WINNER/);
+        if (!winner) return { scores: [] };
+        const winnerIndex = Number(winner[1]);
+        return { scores: Array.from({ length: 20 }, (_, i) => ({ index: i, score: i === winnerIndex ? 10 : 1 })) };
+      }
       generate.lastPrompt = prompt;
       return "Mocked answer.";
     }),
@@ -166,5 +181,30 @@ describe("POST /api/ai/chat — retrieval wiring", () => {
       ["asdf jkl semantically distant phrasing"],
       expect.objectContaining({ onUsage: expect.any(Function) })
     );
+  });
+
+  it("reranks down to the final limit and honors the reranker's ordering (not just RRF's) when more chunks match than fit", async () => {
+    process.env.OPENAI_API_KEY = "sk-test";
+    embedTexts.mockResolvedValue([[1, 0, 0]]);
+
+    const { user, token } = await createUserWithToken();
+    const document = await makeDocument(user._id);
+    for (let i = 0; i < 10; i += 1) {
+      await makeChunk(document._id, user._id, {
+        index: i,
+        contentHash: `hash-${i}`,
+        text: i === 7 ? "UNIQUE_RERANK_WINNER mitochondria" : "mitochondria produces ATP for the cell",
+        page: i + 1,
+        endPage: i + 1,
+      });
+    }
+    const res = await request(app)
+      .post("/api/ai/chat")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ documentId: document._id.toString(), message: "How does mitochondria produce ATP?" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sources).toHaveLength(6);
+    expect(res.body.sources[0].snippet).toContain("UNIQUE_RERANK_WINNER");
   });
 });

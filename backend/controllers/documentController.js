@@ -25,14 +25,21 @@ const isPdfFile = async (filePath) => {
 };
 
 // Returns the per-page text alongside the concatenated string, so the page
-// boundaries can be recorded now rather than guessed at later. pdf-parse joins
-// pages with a "\n\n" separator, which `buildPageMap` accounts for.
+// boundaries can be recorded now rather than guessed at later. The
+// concatenated string is built here from `pages`, joined by "\n\n" —
+// deliberately not pdf-parse's own `result.text`, which splices a
+// "-- N of M --" footer in between every page. `buildPageMap` assumes a
+// plain "\n\n" join with nothing else in between; using pdf-parse's raw text
+// would silently desync every page offset (and therefore every citation)
+// after page 1.
 const extractText = async (filePath) => {
   const buffer = await fs.readFile(filePath);
   const parser = new PDFParse({ data: buffer });
   try {
     const result = await parser.getText();
-    return { text: result.text || "", pages: result.pages || [] };
+    const pages = result.pages || [];
+    const text = pages.map((p) => p.text || "").join("\n\n");
+    return { text, pages };
   } finally {
     await parser.destroy();
   }

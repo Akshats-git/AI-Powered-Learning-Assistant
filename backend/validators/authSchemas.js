@@ -41,3 +41,9 @@ export const verifyEmailSchema = requestSchema({
     token: z.string().min(1, "Verification token is required"),
   }),
 });
+
+export const revokeSessionSchema = requestSchema({
+  params: z.object({
+    familyId: z.string().uuid("familyId must be a valid id"),
+  }),
+});

@@ -17,6 +17,11 @@ const refreshTokenSchema = new mongoose.Schema(
     usedAt: { type: Date, default: null },
     revokedAt: { type: Date, default: null },
     expiresAt: { type: Date, required: true },
+    // Captured once at login and carried forward through every rotation in
+    // the family — what a "sessions" list shows the user so they can tell
+    // which row is "this laptop" vs. something to revoke.
+    userAgent: { type: String, default: "" },
+    ip: { type: String, default: "" },
   },
   { timestamps: true }
 );

@@ -1,7 +1,14 @@
 import User from "../models/User.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utils/generateToken.js";
 import { setRefreshCookie, clearRefreshCookie, readRefreshCookie } from "../utils/refreshCookie.js";
-import { startRefreshFamily, rotateRefreshToken, revokeFamily, revokeAllForUser } from "../utils/refreshTokenStore.js";
+import {
+  startRefreshFamily,
+  rotateRefreshToken,
+  revokeFamily,
+  revokeAllForUser,
+  listActiveSessions,
+  revokeOwnedSession,
+} from "../utils/refreshTokenStore.js";
 import { isAdminEmail } from "../utils/adminEmails.js";
 import { createResetToken, consumeResetToken } from "../utils/passwordResetStore.js";
 import { createVerificationToken, consumeVerificationToken } from "../utils/emailVerificationStore.js";
@@ -14,8 +21,11 @@ const LOCK_DURATION_MS = (Number(process.env.ACCOUNT_LOCK_MINUTES) || 15) * 60 *
 // Starts a brand-new rotation family (utils/refreshTokenStore.js) — every
 // login/register is the start of a chain of refresh tokens that reuse
 // detection can later revoke as a unit.
-const issueTokens = async (res, user) => {
-  const { jti, familyId } = await startRefreshFamily(user._id);
+const issueTokens = async (req, res, user) => {
+  const { jti, familyId } = await startRefreshFamily(user._id, {
+    userAgent: req.headers["user-agent"],
+    ip: req.ip,
+  });
   setRefreshCookie(res, generateRefreshToken(user._id, jti, familyId));
   return { accessToken: generateAccessToken(user._id), csrfToken: issueCsrfToken(res) };
 };
@@ -51,7 +61,7 @@ export const register = async (req, res, next) => {
     const user = await User.create({ username, email, password });
     await sendVerificationEmail(user);
 
-    const { accessToken, csrfToken } = await issueTokens(res, user);
+    const { accessToken, csrfToken } = await issueTokens(req, res, user);
     res.status(201).json({ user: withIsAdmin(user), token: accessToken, csrfToken });
   } catch (err) {
     next(err);
@@ -98,7 +108,7 @@ export const login = async (req, res, next) => {
     if (user.needsPasswordRehash()) user.password = password;
     await user.save();
 
-    const { accessToken, csrfToken } = await issueTokens(res, user);
+    const { accessToken, csrfToken } = await issueTokens(req, res, user);
     res.status(200).json({ user: withIsAdmin(user), token: accessToken, csrfToken });
   } catch (err) {
     next(err);
@@ -197,6 +207,62 @@ export const logout = async (req, res, next) => {
 export const getProfile = async (req, res, next) => {
   try {
     res.status(200).json({ user: withIsAdmin(req.user) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Best-effort: if this browser's own refresh cookie is present and valid,
+// its familyId marks which row in the list is "this device" — a missing or
+// unparseable cookie (e.g. the caller is a non-browser API client) just
+// means nothing gets flagged as current, not an error.
+const currentFamilyId = (req) => {
+  const token = readRefreshCookie(req);
+  if (!token) return null;
+  try {
+    return verifyRefreshToken(token).familyId || null;
+  } catch {
+    return null;
+  }
+};
+
+export const listSessions = async (req, res, next) => {
+  try {
+    const activeFamilyId = currentFamilyId(req);
+    const sessions = await listActiveSessions(req.user._id);
+
+    res.status(200).json({
+      sessions: sessions.map((s) => ({
+        familyId: s.familyId,
+        userAgent: s.userAgent,
+        ip: s.ip,
+        lastActiveAt: s.createdAt,
+        isCurrent: s.familyId === activeFamilyId,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const revokeSession = async (req, res, next) => {
+  try {
+    const { familyId } = req.params;
+    const revoked = await revokeOwnedSession(familyId, req.user._id);
+    if (!revoked) {
+      res.status(404);
+      throw new Error("Session not found");
+    }
+
+    // Revoking the session the request itself is riding on should also log
+    // this browser out immediately, not just leave it holding a cookie
+    // that'll fail on its next refresh.
+    if (familyId === currentFamilyId(req)) {
+      clearRefreshCookie(res);
+      clearCsrfCookie(res);
+    }
+
+    res.status(200).json({ message: "Session revoked" });
   } catch (err) {
     next(err);
   }

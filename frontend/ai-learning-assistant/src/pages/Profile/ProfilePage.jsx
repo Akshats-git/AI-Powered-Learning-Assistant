@@ -4,6 +4,7 @@ import { User, Mail, Lock } from "lucide-react";
 
 import { useAuth } from "../../hooks/useAuth";
 import { updatePassword } from "../../services/authService";
+import ActiveSessions from "../../components/profile/ActiveSessions";
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -154,6 +155,8 @@ const ProfilePage = () => {
           </button>
         </form>
       </div>
+
+      <ActiveSessions />
     </div>
   );
 };

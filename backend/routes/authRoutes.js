@@ -10,6 +10,8 @@ import {
   resetPassword,
   verifyEmail,
   resendVerification,
+  listSessions,
+  revokeSession,
 } from "../controllers/authController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { validate } from "../middlewares/validate.js";
@@ -21,6 +23,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   verifyEmailSchema,
+  revokeSessionSchema,
 } from "../validators/authSchemas.js";
 
 const router = express.Router();
@@ -35,5 +38,7 @@ router.post("/forgot-password", authRateLimiter, validate(forgotPasswordSchema),
 router.post("/reset-password", authRateLimiter, validate(resetPasswordSchema), resetPassword);
 router.post("/verify-email", authRateLimiter, validate(verifyEmailSchema), verifyEmail);
 router.post("/resend-verification", protect, authRateLimiter, resendVerification);
+router.get("/sessions", protect, listSessions);
+router.delete("/sessions/:familyId", protect, validate(revokeSessionSchema), revokeSession);
 
 export default router;

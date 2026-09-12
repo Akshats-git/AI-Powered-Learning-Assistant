@@ -10,6 +10,8 @@ export const API_PATHS = {
     RESET_PASSWORD: "/api/auth/reset-password",
     VERIFY_EMAIL: "/api/auth/verify-email",
     RESEND_VERIFICATION: "/api/auth/resend-verification",
+    SESSIONS: "/api/auth/sessions",
+    REVOKE_SESSION: (familyId) => `/api/auth/sessions/${familyId}`,
   },
   DOCUMENTS: {
     UPLOAD: "/api/documents/upload",

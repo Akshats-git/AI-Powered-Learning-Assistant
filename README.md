@@ -9,7 +9,7 @@ features.
 
 ## Features
 
-- **Auth**: JWT based register and login, protected routes, password change, email-based password reset and email verification with single-use expiring tokens, CSRF-protected token refresh
+- **Auth**: JWT based register and login, protected routes, password change, email-based password reset and email verification with single-use expiring tokens, CSRF-protected token refresh with rotation and reuse detection, an active-sessions list on the Profile page for signing out other devices
 - **Documents**: drag and drop PDF upload (10MB limit), text extraction, in-app viewer
 - **AI Chat**: ask questions about a document and get markdown replies with code highlighting
 - **AI Actions**: one-click summaries and on-demand concept explanations

@@ -22,3 +22,7 @@ export const resetPassword = (data) => axiosInstance.post(API_PATHS.AUTH.RESET_P
 export const verifyEmail = (data) => axiosInstance.post(API_PATHS.AUTH.VERIFY_EMAIL, data);
 
 export const resendVerification = () => axiosInstance.post(API_PATHS.AUTH.RESEND_VERIFICATION);
+
+export const listSessions = () => axiosInstance.get(API_PATHS.AUTH.SESSIONS);
+
+export const revokeSession = (familyId) => axiosInstance.delete(API_PATHS.AUTH.REVOKE_SESSION(familyId));

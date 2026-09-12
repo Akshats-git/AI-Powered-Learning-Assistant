@@ -7,6 +7,7 @@ import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 import { buildPageMap } from "../utils/pageMap.js";
 import { ingestDocument } from "../utils/ingest.js";
+import { ocrPdf } from "../utils/ocr.js";
 import { logger } from "../utils/logger.js";
 
 // A browser-set mimetype is trivially spoofed (rename a .exe to .pdf), so
@@ -88,7 +89,31 @@ export const uploadDocument = async (req, res, next) => {
         throw new Error("Uploaded file is not a valid PDF");
       }
 
-      const { text: extractedText, pages } = await extractText(req.file.path);
+      let { text: extractedText, pages } = await extractText(req.file.path);
+      let textSource = "native";
+      let ocrTruncated = false;
+      let pageCount;
+
+      // No text layer usually means a scanned/image-only PDF — fall back to
+      // OCR rather than hard-failing (the pre-Part-0 behavior). Best-effort:
+      // an OCR failure just leaves the document exactly as unusable as it
+      // already was, not worse.
+      if (!extractedText.trim()) {
+        try {
+          const buffer = await fs.readFile(req.file.path);
+          const ocrResult = await ocrPdf(buffer);
+          if (ocrResult.text.trim()) {
+            extractedText = ocrResult.text;
+            pages = ocrResult.pages;
+            textSource = "ocr";
+            ocrTruncated = ocrResult.truncated;
+            pageCount = ocrResult.pageCount;
+          }
+        } catch (err) {
+          logger.error({ err: err.message }, "OCR fallback failed during upload");
+        }
+      }
+
       const pageMap = buildPageMap(pages);
 
       const document = await Document.create({
@@ -100,7 +125,9 @@ export const uploadDocument = async (req, res, next) => {
         mimeType: req.file.mimetype,
         extractedText,
         hasExtractedText: Boolean(extractedText && extractedText.trim()),
-        pageCount: pageMap.length,
+        textSource,
+        ocrTruncated,
+        pageCount: pageCount ?? pageMap.length,
         pageMap,
       });
 

@@ -10,7 +10,7 @@ features.
 ## Features
 
 - **Auth**: JWT based register and login, protected routes, password change, email-based password reset and email verification with single-use expiring tokens, CSRF-protected token refresh with rotation and reuse detection, an active-sessions list on the Profile page for signing out other devices
-- **Documents**: drag and drop PDF upload (10MB limit), text extraction, in-app viewer
+- **Documents**: drag and drop PDF upload (10MB limit), text extraction with an OCR fallback for scanned/image-only PDFs, in-app viewer
 - **AI Chat**: ask questions about a document and get markdown replies with code highlighting
 - **AI Actions**: one-click summaries and on-demand concept explanations
 - **Flashcards**: AI-generated sets with a flip-card viewer, keyboard navigation, per-card review tracking and progress bars
@@ -25,8 +25,9 @@ react-syntax-highlighter.
 
 **Backend:** Node.js, Express 5, MongoDB + Mongoose, JWT auth, argon2id
 password hashing (bcryptjs kept only to verify pre-migration hashes),
-multer (uploads), pdf-parse (text extraction), the OpenAI API for AI
-generation, helmet + compression + express-rate-limit for hardening.
+multer (uploads), pdf-parse (text extraction), tesseract.js (OCR fallback
+for scanned PDFs), the OpenAI API for AI generation, helmet + compression +
+express-rate-limit for hardening.
 
 > The original plan targeted Google Gemini. This build uses the OpenAI API
 > instead. The AI layer (`backend/utils/aiClient.js`) is a single thin
@@ -144,7 +145,10 @@ does and doesn't prove). Regenerate it with `npm run compare-schedulers`.
 ## Notes
 
 - AI routes are rate limited to 30 requests per 15 minutes per user. They
-  also block documents with no extractable text, such as scanned PDFs.
+  also block documents with no extractable text at all — a scanned/image-only
+  PDF now falls back to OCR at upload time (`OCR_MAX_PAGES`, default 25 pages,
+  since OCR is synchronous and runs during the upload request), so it only
+  blocks AI features if OCR itself finds nothing to read.
 - Every AI call is logged with its token usage and an estimated cost, and can
   be capped per user per month with `MONTHLY_AI_BUDGET_USD` (unset = no cap).
 - Quiz answer keys are never sent to the client until a quiz is submitted.

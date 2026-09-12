@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
-import { FileText, Layers, HelpCircle, AlertTriangle } from "lucide-react";
+import { FileText, Layers, HelpCircle, AlertTriangle, Info } from "lucide-react";
 import { formatFileSize } from "../../utils/helpers";
 
 const DocumentCard = ({ document }) => {
@@ -36,6 +36,15 @@ const DocumentCard = ({ document }) => {
           >
             <AlertTriangle className="w-3 h-3" />
             No text
+          </span>
+        )}
+        {document.hasExtractedText && document.textSource === "ocr" && (
+          <span
+            title="No text layer was found — text was read via OCR and may contain recognition errors"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium"
+          >
+            <Info className="w-3 h-3" />
+            OCR
           </span>
         )}
         {document.fileMissing && (

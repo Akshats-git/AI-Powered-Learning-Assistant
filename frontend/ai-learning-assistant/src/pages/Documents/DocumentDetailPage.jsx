@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Info } from "lucide-react";
 
 import { getDocument } from "../../services/documentService";
 import ContentTab from "../../components/documents/tabs/ContentTab";
@@ -65,6 +65,18 @@ const DocumentDetailPage = () => {
           <p>
             No extractable text was found in this PDF (it's likely scanned or image-based). Chat,
             summaries, flashcards and quizzes won't work for this document.
+          </p>
+        </div>
+      )}
+
+      {document.hasExtractedText && document.textSource === "ocr" && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 mb-6 text-sm text-blue-800">
+          <Info className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>
+            This PDF had no text layer, so its text was read via OCR instead — it may contain
+            recognition errors.
+            {document.ocrTruncated &&
+              " Only the first pages could be scanned; chat, summaries, flashcards and quizzes won't see the rest of this document."}
           </p>
         </div>
       )}

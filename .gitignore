@@ -12,6 +12,7 @@ node_modules/
 # Backend
 backend/uploads/*
 !backend/uploads/.gitkeep
+backend/.cache/
 
 # Build output
 dist/

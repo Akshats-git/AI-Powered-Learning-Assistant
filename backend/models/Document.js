@@ -19,6 +19,14 @@ const documentSchema = new mongoose.Schema(
     mimeType: { type: String, required: true },
     extractedText: { type: String, default: "" },
     hasExtractedText: { type: Boolean, default: false },
+    // "ocr" means the PDF had no text layer (scanned/image-only) and
+    // extractedText came from rendering pages to images and running OCR
+    // instead — worth surfacing to the user, since OCR text can contain
+    // recognition errors a native text layer never would.
+    textSource: { type: String, enum: ["native", "ocr"], default: "native" },
+    // True when OCR hit its page cap (utils/ocr.js's OCR_MAX_PAGES) before
+    // reading the whole document — later pages have no extracted text at all.
+    ocrTruncated: { type: Boolean, default: false },
     pageCount: { type: Number, default: 0 },
     // Where each page starts and ends inside `extractedText`. Captured at
     // parse time because it is unrecoverable afterwards — once the PDF is one

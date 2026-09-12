@@ -1,17 +1,18 @@
 import crypto from "crypto";
 import OpenAI from "openai";
 import { logger } from "./logger.js";
+import { getActiveApiKey } from "./aiContext.js";
 
-let client;
-
+// No module-level singleton — see aiClient.js's getClient() for why (the
+// active key varies per request now that users can supply their own).
 const getClient = () => {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  const apiKey = getActiveApiKey();
+  if (!apiKey) {
+    const err = new Error("No OpenAI API key is configured. Add your own key in Profile settings, or ask the site owner to configure one.");
+    err.statusCode = 400;
+    throw err;
   }
-  if (!client) {
-    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  }
-  return client;
+  return new OpenAI({ apiKey });
 };
 
 export const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
@@ -63,6 +64,10 @@ export const embedTexts = async (texts, { onUsage } = {}) => {
 
   const model = EMBEDDING_MODEL;
   const results = new Array(texts.length);
+  // Hoisted out of the batch loop and its try/catch below, same reasoning as
+  // aiClient.js's generate(): a missing key is a 400 the caller should
+  // degrade on, not a 502 wrapped as "generation failed".
+  const openai = getClient();
 
   for (const batch of chunkArray(
     texts.map((text, index) => ({ text, index })),
@@ -71,7 +76,7 @@ export const embedTexts = async (texts, { onUsage } = {}) => {
     const startedAt = Date.now();
     let response;
     try {
-      response = await getClient().embeddings.create({
+      response = await openai.embeddings.create({
         model,
         input: batch.map((b) => b.text),
       });

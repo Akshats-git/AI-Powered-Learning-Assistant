@@ -3,6 +3,7 @@ import { chunkText } from "./chunking.js";
 import { hashChunkText, embedTexts, EMBEDDING_MODEL } from "./embeddings.js";
 import { assertWithinBudget, recordSpend } from "./aiBudget.js";
 import { recordLlmCall } from "./llmLedger.js";
+import { hasActiveApiKey } from "./aiContext.js";
 import { logger } from "./logger.js";
 
 // The rest of the ingest pipeline the roadmap describes:
@@ -80,7 +81,7 @@ export const ingestDocument = async (document, { requestId = null } = {}) => {
 
   const { toEmbed, reused } = partitionChunksToEmbed(chunks, cacheByHash.keys());
 
-  if (toEmbed.length > 0 && process.env.OPENAI_API_KEY) {
+  if (toEmbed.length > 0 && hasActiveApiKey()) {
     // One captured usage entry per API batch (embedTexts calls the provider
     // once per 100 chunks) — mirrors "one LlmCall row per provider call"
     // everywhere else, rather than collapsing a whole document's embedding
@@ -114,7 +115,7 @@ export const ingestDocument = async (document, { requestId = null } = {}) => {
       }
     }
   } else if (toEmbed.length > 0) {
-    logger.warn({ documentId: document._id, count: toEmbed.length }, "Skipping embeddings — OPENAI_API_KEY not configured");
+    logger.warn({ documentId: document._id, count: toEmbed.length }, "Skipping embeddings — no OpenAI API key available (neither the user's own nor a shared one)");
   }
 
   for (const chunk of reused) {

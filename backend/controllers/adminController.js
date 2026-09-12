@@ -16,7 +16,11 @@ export const getCostOverview = async (req, res, next) => {
   try {
     const days = parseDays(req.query.days);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const match = { createdAt: { $gte: since } };
+    // Only calls billed to the deployer's own OPENAI_API_KEY — a user
+    // spending their own saved key (keySource "own") costs the deployer
+    // nothing and would otherwise inflate this dashboard with spend that
+    // was never actually on their bill.
+    const match = { createdAt: { $gte: since }, keySource: { $ne: "own" } };
 
     const [byDay, byUser, totals] = await Promise.all([
       LlmCall.aggregate([

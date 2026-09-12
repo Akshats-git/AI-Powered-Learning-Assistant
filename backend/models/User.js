@@ -13,6 +13,13 @@ const userSchema = new mongoose.Schema(
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
     emailVerifiedAt: { type: Date, default: null },
+    // A user's own OpenAI key, encrypted at rest (utils/encryption.js) —
+    // select: false so it never rides along on a normal query; only
+    // middlewares/aiKeyContext.js explicitly re-selects it. last4 is safe to
+    // expose (it's how the profile page shows "key ending in ...abcd"
+    // without ever sending the real value back to the browser).
+    openaiApiKeyEncrypted: { type: String, select: false, default: null },
+    openaiApiKeyLast4: { type: String, default: null },
   },
   { timestamps: true }
 );
@@ -42,6 +49,10 @@ userSchema.set("toJSON", {
     delete ret.password;
     delete ret.failedLoginAttempts;
     delete ret.lockUntil;
+    // Defense in depth on top of select: false — this field should never be
+    // present on a doc serialized here, but never leaking it is worth not
+    // relying on a single layer for.
+    delete ret.openaiApiKeyEncrypted;
     return ret;
   },
 });

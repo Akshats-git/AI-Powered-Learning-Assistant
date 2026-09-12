@@ -12,6 +12,8 @@ import {
   resendVerification,
   listSessions,
   revokeSession,
+  updateApiKey,
+  removeApiKey,
 } from "../controllers/authController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { validate } from "../middlewares/validate.js";
@@ -24,6 +26,7 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
   revokeSessionSchema,
+  updateApiKeySchema,
 } from "../validators/authSchemas.js";
 
 const router = express.Router();
@@ -40,5 +43,7 @@ router.post("/verify-email", authRateLimiter, validate(verifyEmailSchema), verif
 router.post("/resend-verification", protect, authRateLimiter, resendVerification);
 router.get("/sessions", protect, listSessions);
 router.delete("/sessions/:familyId", protect, validate(revokeSessionSchema), revokeSession);
+router.put("/api-key", protect, validate(updateApiKeySchema), updateApiKey);
+router.delete("/api-key", protect, removeApiKey);
 
 export default router;

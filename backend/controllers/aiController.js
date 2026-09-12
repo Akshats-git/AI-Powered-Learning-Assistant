@@ -28,6 +28,7 @@ import { verifyGroundedness } from "../utils/groundedness.js";
 import { rewriteQuery } from "../utils/queryRewrite.js";
 import { getCachedChatReply, cacheChatReply, getCachedSummary, cacheSummary } from "../utils/semanticCache.js";
 import { hashChunkText } from "../utils/embeddings.js";
+import { hasActiveApiKey } from "../utils/aiContext.js";
 import { logger } from "../utils/logger.js";
 
 // Wider than the final answer set (DEFAULT_RESULT_LIMIT) on purpose — RRF
@@ -242,7 +243,7 @@ export const explainConcept = async (req, res, next) => {
 // retrieval, it never fails the chat) and records that embedding's spend
 // through the same budget/ledger every other AI call goes through.
 const embedQuery = async (message, { userId, requestId, documentId }) => {
-  if (!process.env.OPENAI_API_KEY) return null;
+  if (!hasActiveApiKey()) return null;
 
   try {
     const batchUsages = [];

@@ -14,6 +14,8 @@ import { createResetToken, consumeResetToken } from "../utils/passwordResetStore
 import { createVerificationToken, consumeVerificationToken } from "../utils/emailVerificationStore.js";
 import { sendMail } from "../utils/mailer.js";
 import { issueCsrfToken, clearCsrfCookie, isCsrfTokenValid } from "../utils/csrf.js";
+import { encrypt } from "../utils/encryption.js";
+import { verifyOpenAiKey } from "../utils/verifyOpenAiKey.js";
 
 const MAX_FAILED_ATTEMPTS = Number(process.env.ACCOUNT_LOCK_MAX_ATTEMPTS) || 5;
 const LOCK_DURATION_MS = (Number(process.env.ACCOUNT_LOCK_MINUTES) || 15) * 60 * 1000;
@@ -32,8 +34,15 @@ const issueTokens = async (req, res, user) => {
 
 // isAdmin is never stored — it's computed from ADMIN_EMAILS on every
 // response so the frontend can show/hide the admin nav link without a
-// separate "am I an admin" round trip.
-const withIsAdmin = (user) => ({ ...user.toJSON(), isAdmin: isAdminEmail(user.email) });
+// separate "am I an admin" round trip. aiSharedKeyConfigured is similarly
+// derived rather than per-user: it tells the Profile page whether AI
+// features work at all without the user saving their own key (see
+// middlewares/aiKeyContext.js) — a boolean, never the key itself.
+const withIsAdmin = (user) => ({
+  ...user.toJSON(),
+  isAdmin: isAdminEmail(user.email),
+  aiSharedKeyConfigured: Boolean(process.env.OPENAI_API_KEY),
+});
 
 // Best-effort: registration succeeds either way. A failed send (or an
 // unconfigured mail provider — see utils/mailer.js) just means the user
@@ -367,6 +376,48 @@ export const updatePassword = async (req, res, next) => {
     await user.save();
 
     res.status(200).json({ message: "Password updated successfully" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Lets a user fund their own AI usage instead of drawing on the deployer's
+// shared key (see middlewares/aiKeyContext.js) — this is the whole answer to
+// "how does this work in production without me paying for every visitor."
+// Verified live against OpenAI before it's saved, so a typo'd or revoked key
+// fails here with a clear message rather than surfacing later as a cryptic
+// 401 the next time the user tries to chat.
+export const updateApiKey = async (req, res, next) => {
+  try {
+    const { apiKey } = req.body;
+
+    try {
+      await verifyOpenAiKey(apiKey);
+    } catch {
+      res.status(400);
+      throw new Error("OpenAI rejected that key — double-check you copied it correctly and that it hasn't been revoked.");
+    }
+
+    const openaiApiKeyLast4 = apiKey.slice(-4);
+    await User.updateOne(
+      { _id: req.user._id },
+      { $set: { openaiApiKeyEncrypted: encrypt(apiKey), openaiApiKeyLast4 } }
+    );
+
+    res.status(200).json({ message: "API key saved", openaiApiKeyLast4 });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const removeApiKey = async (req, res, next) => {
+  try {
+    await User.updateOne(
+      { _id: req.user._id },
+      { $set: { openaiApiKeyEncrypted: null, openaiApiKeyLast4: null } }
+    );
+
+    res.status(200).json({ message: "API key removed" });
   } catch (err) {
     next(err);
   }

@@ -6,6 +6,7 @@ const FULL_ENV = {
   JWT_SECRET: "secret",
   CLIENT_URL: "http://localhost:5173",
   OPENAI_API_KEY: "sk-test",
+  ENCRYPTION_KEY: "a long random passphrase",
 };
 
 describe("validateEnv", () => {
@@ -23,5 +24,11 @@ describe("validateEnv", () => {
     const { OPENAI_API_KEY, ...rest } = FULL_ENV;
     void OPENAI_API_KEY;
     expect(validateEnv(rest)).toEqual({ missingRecommended: ["OPENAI_API_KEY"] });
+  });
+
+  it("reports ENCRYPTION_KEY as missing-recommended too", () => {
+    const { ENCRYPTION_KEY, ...rest } = FULL_ENV;
+    void ENCRYPTION_KEY;
+    expect(validateEnv(rest)).toEqual({ missingRecommended: ["ENCRYPTION_KEY"] });
   });
 });

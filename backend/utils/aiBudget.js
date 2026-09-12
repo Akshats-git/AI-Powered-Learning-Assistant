@@ -1,9 +1,15 @@
 import User from "../models/User.js";
+import { getActiveKeySource } from "./aiContext.js";
 
 // One scripted user with a valid token can otherwise run an unbounded OpenAI
 // bill through the AI rate limiter alone (it limits requests, not dollars).
 // This caps actual spend per user per calendar month; unset the env var to
 // disable it entirely.
+//
+// It only ever applies to the deployer's shared fallback key
+// (keySource "shared" — see aiContext.js/aiKeyContext.js). A user spending
+// their own saved key is spending their own money, so there's nothing here
+// to cap or record.
 const currentMonthKey = () => new Date().toISOString().slice(0, 7); // "2026-09"
 
 const getBudgetLimitUsd = () => {
@@ -19,6 +25,8 @@ const currentSpend = (user) => {
 };
 
 export const assertWithinBudget = async (userId) => {
+  if (getActiveKeySource() === "own") return;
+
   const limit = getBudgetLimitUsd();
   if (limit === null) return;
 
@@ -33,6 +41,7 @@ export const assertWithinBudget = async (userId) => {
 };
 
 export const recordSpend = async (userId, costUsd) => {
+  if (getActiveKeySource() === "own") return;
   if (!costUsd || costUsd <= 0) return;
 
   const month = currentMonthKey();

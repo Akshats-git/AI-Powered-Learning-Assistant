@@ -1,4 +1,5 @@
 import LlmCall from "../models/LlmCall.js";
+import { getActiveKeySource } from "./aiContext.js";
 
 // usageInfo is whatever aiClient.generate()'s onUsage callback captured:
 // { costUsd, usage, model, latencyMs }. There's nothing to record if the
@@ -16,5 +17,6 @@ export const recordLlmCall = async (userId, requestId, feature, usageInfo) => {
     costUsd: usageInfo.costUsd ?? null,
     latencyMs: usageInfo.latencyMs ?? null,
     requestId,
+    keySource: getActiveKeySource() || "shared",
   });
 };

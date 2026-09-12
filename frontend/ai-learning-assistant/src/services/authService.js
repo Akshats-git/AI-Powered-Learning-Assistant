@@ -26,3 +26,7 @@ export const resendVerification = () => axiosInstance.post(API_PATHS.AUTH.RESEND
 export const listSessions = () => axiosInstance.get(API_PATHS.AUTH.SESSIONS);
 
 export const revokeSession = (familyId) => axiosInstance.delete(API_PATHS.AUTH.REVOKE_SESSION(familyId));
+
+export const saveApiKey = (apiKey) => axiosInstance.put(API_PATHS.AUTH.API_KEY, { apiKey });
+
+export const removeApiKey = () => axiosInstance.delete(API_PATHS.AUTH.API_KEY);

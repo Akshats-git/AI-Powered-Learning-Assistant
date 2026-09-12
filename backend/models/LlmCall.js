@@ -15,6 +15,10 @@ const llmCallSchema = new mongoose.Schema(
     costUsd: { type: Number, default: null },
     latencyMs: { type: Number, default: null },
     requestId: { type: String, default: null },
+    // "shared" = billed to the deployer's OPENAI_API_KEY, "own" = the user's
+    // own saved key. Lets the admin cost dashboard show only spend that's
+    // actually on the deployer's bill, not every call anyone's made.
+    keySource: { type: String, enum: ["shared", "own"], default: "shared" },
   },
   { timestamps: true }
 );

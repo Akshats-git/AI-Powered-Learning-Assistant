@@ -51,6 +51,23 @@ describe("GET /api/admin/costs", () => {
     expect(spenderRow.costUsd).toBeCloseTo(0.05, 5);
   });
 
+  it("excludes calls billed to a user's own key from the deployer's cost totals", async () => {
+    const { token } = await createUserWithToken({ email: "admin@example.com" });
+    process.env.ADMIN_EMAILS = "admin@example.com";
+
+    const { user: byokUser } = await createUserWithToken({ email: "byok@example.com" });
+
+    await LlmCall.create([
+      { user: byokUser._id, feature: "chat", model: "gpt-4o-mini", costUsd: 5, totalTokens: 100, keySource: "shared" },
+      { user: byokUser._id, feature: "chat", model: "gpt-4o-mini", costUsd: 999, totalTokens: 100, keySource: "own" },
+    ]);
+
+    const res = await request(app).get("/api/admin/costs").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalCalls).toBe(1);
+    expect(res.body.totalCostUsd).toBeCloseTo(5, 5);
+  });
+
   it("clamps an out-of-range days query instead of trusting the client", async () => {
     const { token } = await createUserWithToken({ email: "admin@example.com" });
     process.env.ADMIN_EMAILS = "admin@example.com";

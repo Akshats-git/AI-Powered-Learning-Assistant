@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { assertWithinBudget, recordSpend } from "../utils/aiBudget.js";
+import { runWithApiKey } from "../utils/aiContext.js";
+import User from "../models/User.js";
 import { createUserWithToken } from "./helpers.js";
 
 const ORIGINAL_BUDGET_ENV = process.env.MONTHLY_AI_BUDGET_USD;
@@ -51,5 +53,20 @@ describe("aiBudget", () => {
     await recordSpend(user._id, 0);
     await recordSpend(user._id, null);
     await expect(assertWithinBudget(user._id)).resolves.toBeUndefined();
+  });
+
+  it("never caps or records spend when the active key is the user's own", async () => {
+    process.env.MONTHLY_AI_BUDGET_USD = "1";
+    const { user } = await createUserWithToken();
+
+    await runWithApiKey({ apiKey: "sk-own-key", keySource: "own" }, async () => {
+      await recordSpend(user._id, 50); // way over the $1 cap
+      await expect(assertWithinBudget(user._id)).resolves.toBeUndefined();
+    });
+
+    // recordSpend should have been a no-op — nothing written to the user's
+    // running total at all.
+    const reloaded = await User.findById(user._id);
+    expect(reloaded.aiUsage.spendUsd).toBe(0);
   });
 });

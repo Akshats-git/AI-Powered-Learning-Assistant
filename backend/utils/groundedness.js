@@ -1,6 +1,7 @@
 import { generate } from "./aiClient.js";
 import { assertWithinBudget, recordSpend } from "./aiBudget.js";
 import { recordLlmCall } from "./llmLedger.js";
+import { hasActiveApiKey } from "./aiContext.js";
 import { logger } from "./logger.js";
 
 // "A second cheap pass checks each claim against the retrieved chunks.
@@ -53,7 +54,7 @@ export const parseGroundednessResponse = (response) => {
  */
 export const verifyGroundedness = async ({ answer, context, userId, requestId, feature = "groundedness" }) => {
   if (!answer?.trim() || !context?.trim()) return null;
-  if (!process.env.OPENAI_API_KEY) return null;
+  if (!hasActiveApiKey()) return null;
 
   try {
     await assertWithinBudget(userId);

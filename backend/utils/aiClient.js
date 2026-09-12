@@ -1,17 +1,20 @@
 import OpenAI from "openai";
 import { logger } from "./logger.js";
 import { modelForFeature } from "./modelRouting.js";
+import { getActiveApiKey } from "./aiContext.js";
 
-let client;
-
+// No module-level singleton anymore: the active key can differ per request
+// (a user's own key vs. the deployer's shared fallback — see aiContext.js),
+// so a client has to be built fresh per call. `new OpenAI()` does no network
+// I/O, so this costs nothing next to the API call itself.
 const getClient = () => {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  const apiKey = getActiveApiKey();
+  if (!apiKey) {
+    const err = new Error("No OpenAI API key is configured. Add your own key in Profile settings, or ask the site owner to configure one.");
+    err.statusCode = 400;
+    throw err;
   }
-  if (!client) {
-    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  }
-  return client;
+  return new OpenAI({ apiKey });
 };
 
 const stripJsonFences = (text) =>
@@ -43,9 +46,14 @@ export const generate = async (prompt, { json = false, feature = "unknown", onUs
   const model = modelForFeature(feature);
   const startedAt = Date.now();
 
+  // Outside the try/catch below on purpose: a missing key is a 400 the user
+  // can fix themselves (add a key in Profile), not a 502 provider failure —
+  // wrapping it into "AI generation failed" would bury that distinction.
+  const openai = getClient();
+
   let response;
   try {
-    response = await getClient().chat.completions.create({
+    response = await openai.chat.completions.create({
       model,
       messages: [{ role: "user", content: prompt }],
       ...(json ? { response_format: { type: "json_object" } } : {}),

@@ -8,6 +8,7 @@ import {
   getChatHistory,
 } from "../controllers/aiController.js";
 import { protect } from "../middlewares/authMiddleware.js";
+import { attachAiKeyContext } from "../middlewares/aiKeyContext.js";
 import { aiRateLimiter } from "../middlewares/rateLimiter.js";
 import { validate } from "../middlewares/validate.js";
 import {
@@ -23,6 +24,7 @@ const router = express.Router();
 
 router.use(protect);
 router.use(aiRateLimiter);
+router.use(attachAiKeyContext);
 
 router.post("/generate-flashcards", validate(generateFlashcardsSchema), generateFlashcards);
 router.post("/generate-quiz", validate(generateQuizSchema), generateQuiz);

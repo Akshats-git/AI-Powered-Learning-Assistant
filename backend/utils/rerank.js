@@ -1,6 +1,7 @@
 import { generate } from "./aiClient.js";
 import { assertWithinBudget, recordSpend } from "./aiBudget.js";
 import { recordLlmCall } from "./llmLedger.js";
+import { hasActiveApiKey } from "./aiContext.js";
 import { logger } from "./logger.js";
 
 // "Take the fused top-30 and rerank to top-6 with a cross-encoder" — this
@@ -73,7 +74,7 @@ export const rerankChunks = async ({ query, candidates, limit, userId, requestId
 
   if (!Array.isArray(candidates) || candidates.length === 0) return [];
   if (candidates.length <= limit) return candidates;
-  if (!process.env.OPENAI_API_KEY) return fallback();
+  if (!hasActiveApiKey()) return fallback();
 
   try {
     await assertWithinBudget(userId);

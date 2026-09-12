@@ -33,4 +33,12 @@ describe("recordLlmCall", () => {
     await recordLlmCall(user._id, "req-456", "summary", null);
     expect(await LlmCall.countDocuments({ user: user._id })).toBe(0);
   });
+
+  it("defaults keySource to 'shared' outside any request context", async () => {
+    const { user } = await createUserWithToken();
+    await recordLlmCall(user._id, "req-789", "chat", { model: "gpt-4o-mini", usage: {}, costUsd: 0.001 });
+
+    const row = await LlmCall.findOne({ user: user._id });
+    expect(row.keySource).toBe("shared");
+  });
 });

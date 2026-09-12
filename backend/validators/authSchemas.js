@@ -47,3 +47,14 @@ export const revokeSessionSchema = requestSchema({
     familyId: z.string().uuid("familyId must be a valid id"),
   }),
 });
+
+export const updateApiKeySchema = requestSchema({
+  body: z.object({
+    apiKey: z
+      .string()
+      .trim()
+      .min(20, "That doesn't look like a valid OpenAI API key")
+      .max(200, "That doesn't look like a valid OpenAI API key")
+      .regex(/^sk-/, 'OpenAI API keys start with "sk-"'),
+  }),
+});

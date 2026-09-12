@@ -1,6 +1,7 @@
 import { generate } from "./aiClient.js";
 import { assertWithinBudget, recordSpend } from "./aiBudget.js";
 import { recordLlmCall } from "./llmLedger.js";
+import { hasActiveApiKey } from "./aiContext.js";
 import { logger } from "./logger.js";
 
 // "What about the second one?" is unembeddable as-is — neither BM25 nor a
@@ -38,7 +39,7 @@ Respond with ONLY the rewritten standalone question — no quotes, no explanatio
  */
 export const rewriteQuery = async ({ history, question, userId, requestId, feature = "query-rewrite" }) => {
   if (!history || history.length === 0) return question;
-  if (!process.env.OPENAI_API_KEY) return question;
+  if (!hasActiveApiKey()) return question;
 
   try {
     await assertWithinBudget(userId);

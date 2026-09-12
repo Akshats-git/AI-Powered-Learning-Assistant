@@ -10,6 +10,7 @@ features.
 ## Features
 
 - **Auth**: JWT based register and login, protected routes, password change, email-based password reset and email verification with single-use expiring tokens, CSRF-protected token refresh with rotation and reuse detection, an active-sessions list on the Profile page for signing out other devices
+- **Bring-your-own OpenAI key**: a user can save their own key on the Profile page (verified against OpenAI and encrypted at rest) so their AI usage is billed to them, not the deployer; the deployer's own key, if set, is just a capped fallback for users without one — see [Deployment](#deployment) below
 - **Documents**: drag and drop PDF upload (10MB limit), text extraction with an OCR fallback for scanned/image-only PDFs, in-app viewer
 - **AI Chat**: ask questions about a document and get markdown replies with code highlighting
 - **AI Actions**: one-click summaries and on-demand concept explanations
@@ -87,13 +88,19 @@ npm run dev             # http://localhost:8000
 PORT=8000
 MONGO_URI=<your MongoDB connection string>
 JWT_SECRET=<long random string>
+CLIENT_URL=http://localhost:5173
+
+# Optional in dev: without it, AI features only work for a user who's saved
+# their own key on the Profile page. With it, it's used as a fallback for
+# everyone else (see "Deployment" below for why that matters in production).
 OPENAI_API_KEY=<your OpenAI API key>
 OPENAI_MODEL=gpt-4o-mini
-CLIENT_URL=http://localhost:5173
 ```
 
 See `backend/.env.example` for the optional variables (access/refresh token
-lifetimes, account lockout thresholds, AI budget cap) and their defaults.
+lifetimes, account lockout thresholds, AI budget cap, `ENCRYPTION_KEY` for
+saved user API keys, `COOKIE_SAME_SITE` for cross-domain deploys) and their
+defaults.
 
 ### Frontend
 
@@ -142,6 +149,74 @@ actual numbers from a synthetic-learner simulation (this app has no real
 review history yet to replay — see the file for exactly what the simulation
 does and doesn't prove). Regenerate it with `npm run compare-schedulers`.
 
+## Deployment
+
+### Paying for AI usage without exposing your own key to strangers
+
+Deploying this with your own `OPENAI_API_KEY` set means every request against
+it is billed to you. This app's answer is **bring-your-own-key**: each user
+can save their own OpenAI key on the Profile page — it's verified live
+against OpenAI, encrypted at rest (AES-256-GCM, see
+[`backend/utils/encryption.js`](backend/utils/encryption.js)), and used for
+every AI call that user makes (chat, summaries, flashcards, quizzes, and the
+embeddings generated when they upload a document). It's never displayed
+again after saving, only shown masked as "ending in ...ABCD".
+
+The deployer's own `OPENAI_API_KEY` (if set) is only ever a **fallback** for
+a user who hasn't saved their own — and only that fallback path is subject to
+`MONTHLY_AI_BUDGET_USD` and shows up on the `/admin/costs` dashboard; a
+user's own key is their own money, uncapped and unlogged. This gives you
+three deployment shapes, chosen by what you set:
+
+| `OPENAI_API_KEY` set? | `MONTHLY_AI_BUDGET_USD` set? | Result |
+|---|---|---|
+| No | — | BYOK-only. Nobody's usage ever costs you anything; AI features stay off for a user until they add their own key. |
+| Yes | No | Anyone can use AI features funded by your key, **uncapped**. Only reasonable for a private/invite-only deploy. |
+| Yes | Yes | Free tier funded by your key up to the per-user monthly cap, then AI features 429 until the user adds their own key (or the month resets). |
+
+Whichever shape you pick, also set a **hard spend limit in your OpenAI
+dashboard** (platform.openai.com → Settings → Limits) as a backstop —
+`MONTHLY_AI_BUDGET_USD` only throttles calls this app makes; it can't protect
+against a bug or a key leaked some other way.
+
+### The cross-domain cookie gotcha
+
+The refresh token and CSRF token live in httpOnly cookies scoped to
+`/api/auth`. If your frontend and backend end up on genuinely different
+registrable domains — the common free-tier shape of a Vercel frontend plus a
+Render/Railway/Fly backend on their own `*.vercel.app` / `*.onrender.com`
+domains — the default `SameSite=Lax` means browsers silently drop those
+cookies on cross-site requests, and users get logged out the moment their
+15-minute access token expires. Fix it with one env var:
+
+```
+COOKIE_SAME_SITE=none
+```
+
+(requires HTTPS, which every mainstream host gives you by default). If
+instead you put the frontend and backend on subdomains of the same
+registrable domain (e.g. `app.example.com` + `api.example.com`), the default
+`lax` is fine as-is — that's still "same-site" as far as cookies are
+concerned.
+
+### Everything else
+
+- Set `NODE_ENV=production` — it turns on `trust proxy` (needed for accurate
+  rate limiting/lockout behind any platform's reverse proxy), `Secure`
+  cookies, and CORS restricted to `CLIENT_URL`.
+- Set `ENCRYPTION_KEY` explicitly (see `backend/.env.example`) rather than
+  relying on the `JWT_SECRET`-derived dev fallback.
+- Uploaded PDFs are still stored on local disk
+  (`backend/uploads/`) — most PaaS hosts wipe that on every redeploy. The app
+  degrades gracefully (a document whose file was wiped shows a clear banner
+  instead of a broken viewer; chat/flashcards/quiz keep working since the
+  extracted text lives in MongoDB, not on disk) but the PDF itself is gone
+  until re-uploaded. Swap in S3/R2 for real persistence if that matters for
+  your deploy.
+- `docker-compose.yml` runs the whole stack (Mongo, API, and the built
+  frontend behind nginx) in one command for a self-hosted deploy — see the
+  file for which env vars it forwards.
+
 ## Notes
 
 - AI routes are rate limited to 30 requests per 15 minutes per user. They
@@ -149,8 +224,10 @@ does and doesn't prove). Regenerate it with `npm run compare-schedulers`.
   PDF now falls back to OCR at upload time (`OCR_MAX_PAGES`, default 25 pages,
   since OCR is synchronous and runs during the upload request), so it only
   blocks AI features if OCR itself finds nothing to read.
-- Every AI call is logged with its token usage and an estimated cost, and can
-  be capped per user per month with `MONTHLY_AI_BUDGET_USD` (unset = no cap).
+- Every AI call is logged with its token usage and an estimated cost. Spend
+  against the deployer's own shared `OPENAI_API_KEY` (never a user's own saved
+  key — see Deployment) can be capped per user per month with
+  `MONTHLY_AI_BUDGET_USD` (unset = no cap).
 - Quiz answer keys are never sent to the client until a quiz is submitted.
   Grading happens on the server.
 - Login/register/refresh are rate limited to 20 requests per 15 minutes per

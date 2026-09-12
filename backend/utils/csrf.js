@@ -1,15 +1,19 @@
 import crypto from "crypto";
+import { resolveSameSite, resolveSecure } from "./cookieConfig.js";
 
 const CSRF_COOKIE_NAME = "csrfToken";
 const CSRF_HEADER_NAME = "x-csrf-token";
 const CSRF_COOKIE_PATH = "/api/auth";
 
-const cookieOptions = () => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  path: CSRF_COOKIE_PATH,
-});
+const cookieOptions = () => {
+  const sameSite = resolveSameSite();
+  return {
+    httpOnly: true,
+    secure: resolveSecure(sameSite),
+    sameSite,
+    path: CSRF_COOKIE_PATH,
+  };
+};
 
 // Double-submit CSRF defense, adapted so it still works when the frontend
 // lives on a different domain than the API (the deployed target — Vercel +

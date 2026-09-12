@@ -23,6 +23,17 @@ import masteryRoutes from "./routes/masteryRoutes.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
+// Render/Railway/Fly all put a reverse proxy in front of the app. Without
+// this, req.ip is the proxy's internal IP for every request — every user
+// shares one bucket in the AI/auth rate limiters and one row in the account
+// lockout counter, and audit-relevant IPs are wrong. "1" trusts exactly one
+// hop (the platform's own proxy), which is what all three of those look
+// like — not "true", which would trust an arbitrary X-Forwarded-For an
+// attacker could spoof if there were ever a second hop.
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.use(requestId);
 app.use(httpLogger);
 app.use(

@@ -1,15 +1,19 @@
 import { parseDurationMs } from "./parseDuration.js";
+import { resolveSameSite, resolveSecure } from "./cookieConfig.js";
 
 const REFRESH_COOKIE_NAME = "refreshToken";
 const REFRESH_COOKIE_PATH = "/api/auth";
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-const cookieOptions = () => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  path: REFRESH_COOKIE_PATH,
-});
+const cookieOptions = () => {
+  const sameSite = resolveSameSite();
+  return {
+    httpOnly: true,
+    secure: resolveSecure(sameSite),
+    sameSite,
+    path: REFRESH_COOKIE_PATH,
+  };
+};
 
 export const setRefreshCookie = (res, token) => {
   res.cookie(REFRESH_COOKIE_NAME, token, {

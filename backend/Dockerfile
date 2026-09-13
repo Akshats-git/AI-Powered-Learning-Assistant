@@ -4,7 +4,7 @@
 # plain ESM Node, nothing to compile (that changes once Phase 24's
 # TypeScript migration lands).
 
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 # argon2 has no prebuilt musl binary for this version, so node-gyp compiles
 # it from source on install — python3/make/g++ are build-time only and never
@@ -13,7 +13,7 @@ RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 

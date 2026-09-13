@@ -47,19 +47,20 @@ express-rate-limit for hardening.
 ```
 backend/
 ├── config/           db.js
-├── controllers/      auth, document, ai, flashcard, quiz, dashboard, admin
-├── middlewares/      auth, upload, error, rate limiter
-├── models/           User, Document, Flashcard, Quiz, ChatHistory
+├── controllers/      auth, document, ai, flashcard, quiz, dashboard, admin, review, mastery
+├── middlewares/      auth, upload, error, rate limiter, CSRF, AI key context
+├── models/           User, Document, Flashcard, Quiz, QuizAttempt, ChatHistory,
+│                     ReviewLog, Mastery, LlmCall, RefreshToken, and the token/cache models
 ├── routes/           one router per resource, mounted under /api/*
-├── utils/            generateToken, aiClient, prompts, getOwnedDocument
+├── utils/            generateToken, aiClient, prompts, getOwnedDocument, fsrs, sm2, bkt
 ├── uploads/           (gitignored) stored PDFs
 └── server.js
 
 frontend/ai-learning-assistant/src/
-├── components/       layout/, documents/, flashcards/, ui/, auth/
+├── components/       layout/, documents/, flashcards/, quizzes/, dashboard/, profile/, ui/, auth/
 ├── context/          AuthContext.jsx
 ├── hooks/            useAuth.js
-├── pages/            Auth/, Dashboard/, Documents/, Flashcards/, Quizzes/, Profile/
+├── pages/            Auth/, Dashboard/, Documents/, Flashcards/, Quizzes/, Review/, Profile/, Admin/
 ├── services/         one module per API resource
 ├── utils/            axiosInstance, apiPaths, constants, helpers
 └── App.jsx
@@ -69,7 +70,7 @@ frontend/ai-learning-assistant/src/
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.12+
 - A MongoDB instance (local or [Atlas](https://www.mongodb.com/atlas))
 - An [OpenAI API key](https://platform.openai.com/api-keys) (for the AI features)
 

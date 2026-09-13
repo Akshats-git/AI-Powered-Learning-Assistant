@@ -5,18 +5,38 @@ explanations, flashcards and quizzes. Track your progress as you go. This is
 a MERN stack app (MongoDB, Express, React, Node) with an LLM layer for the AI
 features.
 
+**[Live demo](https://ai-learning-assistant-alpha-wine.vercel.app)**. The
+frontend runs on Vercel. The API runs on Render's free tier, which spins
+down after a while with no traffic. The first request can take 30 to 50
+seconds to wake it back up. After that it's fast.
+
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ## Features
 
-- **Auth**: JWT based register and login, protected routes, password change, email-based password reset and email verification with single-use expiring tokens, CSRF-protected token refresh with rotation and reuse detection, an active-sessions list on the Profile page for signing out other devices
-- **Bring-your-own OpenAI key**: a user can save their own key on the Profile page (verified against OpenAI and encrypted at rest) so their AI usage is billed to them, not the deployer; the deployer's own key, if set, is just a capped fallback for users without one — see [Deployment](#deployment) below
-- **Documents**: drag and drop PDF upload (10MB limit), text extraction with an OCR fallback for scanned/image-only PDFs, in-app viewer
-- **AI Chat**: ask questions about a document and get markdown replies with code highlighting
-- **AI Actions**: one-click summaries and on-demand concept explanations
-- **Flashcards**: AI-generated sets with a flip-card viewer, keyboard navigation, per-card review tracking and progress bars
-- **Quizzes**: AI-generated multiple-choice quizzes with server-side grading and detailed results
-- **Dashboard**: document, flashcard and quiz counts plus recent activity
+- **Auth**: Register and log in with JWT. Routes are protected, and you can
+  change your password. Password reset and email verification use
+  single-use tokens that expire. Token refresh is protected with CSRF and
+  rotates on every use, with reuse detection. The Profile page lists your
+  active sessions so you can sign other devices out.
+- **Bring your own OpenAI key**: Save your own key on the Profile page. It
+  gets verified against OpenAI and encrypted at rest, and your AI usage then
+  bills to you instead of the deployer. The deployer's own key, if they set
+  one, only acts as a capped fallback for users without a key of their own.
+  See [Deployment](#deployment) below.
+- **Documents**: Drag and drop a PDF to upload it (10MB limit). Text gets
+  extracted automatically, with OCR as a fallback for scanned or
+  image-only PDFs. View the PDF right in the app.
+- **AI Chat**: Ask questions about a document and get markdown replies with
+  code highlighting.
+- **AI Actions**: Generate a summary in one click, or ask for a concept
+  explanation on demand.
+- **Flashcards**: AI generates flashcard sets. Flip through them with a card
+  viewer and the keyboard. Each card tracks its own review progress.
+- **Quizzes**: AI generates multiple-choice quizzes. Grading happens on the
+  server, and you get a detailed results page.
+- **Dashboard**: See your document, flashcard and quiz counts, plus recent
+  activity.
 
 ## Tech stack
 
@@ -24,11 +44,11 @@ features.
 lucide-react, react-hot-toast, moment, react-markdown + remark-gfm +
 react-syntax-highlighter.
 
-**Backend:** Node.js, Express 5, MongoDB + Mongoose, JWT auth, argon2id
-password hashing (bcryptjs kept only to verify pre-migration hashes),
-multer (uploads), pdf-parse (text extraction), tesseract.js (OCR fallback
-for scanned PDFs), the OpenAI API for AI generation, helmet + compression +
-express-rate-limit for hardening.
+**Backend:** Node.js, Express 5, MongoDB with Mongoose, JWT auth, argon2id
+password hashing (bcryptjs is only kept to verify pre-migration hashes).
+Also multer for uploads, pdf-parse for text extraction, tesseract.js for OCR
+on scanned PDFs, the OpenAI API for AI generation, and helmet, compression
+and express-rate-limit for hardening.
 
 > The original plan targeted Google Gemini. This build uses the OpenAI API
 > instead. The AI layer (`backend/utils/aiClient.js`) is a single thin
@@ -98,10 +118,10 @@ OPENAI_API_KEY=<your OpenAI API key>
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-See `backend/.env.example` for the optional variables (access/refresh token
-lifetimes, account lockout thresholds, AI budget cap, `ENCRYPTION_KEY` for
-saved user API keys, `COOKIE_SAME_SITE` for cross-domain deploys) and their
-defaults.
+Check `backend/.env.example` for the optional variables and their defaults.
+That covers access and refresh token lifetimes, account lockout thresholds,
+the AI budget cap, `ENCRYPTION_KEY` for saved user API keys, and
+`COOKIE_SAME_SITE` for cross-domain deploys.
 
 ### Frontend
 
@@ -118,7 +138,7 @@ npm run dev             # http://localhost:5173
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
-Then open `http://localhost:5173`, register an account, and upload a PDF.
+Then open `http://localhost:5173`. Register an account and upload a PDF.
 
 ## Scripts
 
@@ -133,129 +153,150 @@ Then open `http://localhost:5173`, register an account, and upload a PDF.
 
 ## Spaced repetition: SM-2 vs. FSRS
 
-Flashcard review replaced a binary "reviewed" flag with real scheduling:
-grade a card Again/Hard/Good/Easy (`1`-`4` on the keyboard) and
-[`backend/utils/fsrs.js`](backend/utils/fsrs.js) computes its next due date
-from an explicit stability/difficulty model, not a fixed multiplier. Every
-grade is also written to an immutable `ReviewLog`
+Flashcard review used to be a simple "reviewed" flag. Now it uses real
+scheduling. Grade a card Again, Hard, Good or Easy (keys `1` to `4`) and
+[`backend/utils/fsrs.js`](backend/utils/fsrs.js) works out its next due date
+from a stability and difficulty model, not a fixed multiplier. Every grade
+also gets written to an immutable `ReviewLog`
 ([`backend/models/ReviewLog.js`](backend/models/ReviewLog.js)).
 [`backend/utils/sm2.js`](backend/utils/sm2.js) implements the older SM-2
-algorithm alongside it as the documented baseline the comparison below
-measures FSRS against. `GET /api/review/due` is the unified due queue —
-everything due today across every document, interleaved — with a session UI
-at `/review`.
+algorithm too. It's the documented baseline that the comparison below
+measures FSRS against. `GET /api/review/due` is the unified due queue. It
+pulls everything due today across every document into one interleaved
+session at `/review`.
 
 **[docs/scheduler-comparison.md](docs/scheduler-comparison.md)** has the
-actual numbers from a synthetic-learner simulation (this app has no real
-review history yet to replay — see the file for exactly what the simulation
-does and doesn't prove). Regenerate it with `npm run compare-schedulers`.
+numbers from a synthetic-learner simulation. The app has no real review
+history to replay yet, so read the file for what the simulation does and
+doesn't prove. Regenerate it with `npm run compare-schedulers`.
 
 ## Deployment
 
 ### Paying for AI usage without exposing your own key to strangers
 
-Deploying this with your own `OPENAI_API_KEY` set means every request against
-it is billed to you. This app's answer is **bring-your-own-key**: each user
-can save their own OpenAI key on the Profile page — it's verified live
-against OpenAI, encrypted at rest (AES-256-GCM, see
-[`backend/utils/encryption.js`](backend/utils/encryption.js)), and used for
-every AI call that user makes (chat, summaries, flashcards, quizzes, and the
-embeddings generated when they upload a document). It's never displayed
-again after saving, only shown masked as "ending in ...ABCD".
+If you deploy this with your own `OPENAI_API_KEY` set, every request against
+it gets billed to you. This app's answer is **bring-your-own-key**. Each
+user can save their own OpenAI key on the Profile page. It gets verified
+live against OpenAI and encrypted at rest (AES-256-GCM, see
+[`backend/utils/encryption.js`](backend/utils/encryption.js)). That key is
+then used for every AI call the user makes: chat, summaries, flashcards,
+quizzes, and the embeddings generated when they upload a document. The key
+is never shown again after saving. The Profile page only shows it masked,
+as "ending in ...ABCD".
 
-The deployer's own `OPENAI_API_KEY` (if set) is only ever a **fallback** for
-a user who hasn't saved their own — and only that fallback path is subject to
-`MONTHLY_AI_BUDGET_USD` and shows up on the `/admin/costs` dashboard; a
-user's own key is their own money, uncapped and unlogged. This gives you
-three deployment shapes, chosen by what you set:
+The deployer's own `OPENAI_API_KEY`, if set, is only ever a **fallback** for
+a user who hasn't saved their own key. Only that fallback path is subject
+to `MONTHLY_AI_BUDGET_USD` and shows up on the `/admin/costs` dashboard. A
+user's own key is their own money. It's uncapped and never logged. This
+gives you three deployment shapes, depending on what you set:
 
 | `OPENAI_API_KEY` set? | `MONTHLY_AI_BUDGET_USD` set? | Result |
 |---|---|---|
-| No | — | BYOK-only. Nobody's usage ever costs you anything; AI features stay off for a user until they add their own key. |
+| No | - | BYOK-only. Nobody's usage ever costs you anything; AI features stay off for a user until they add their own key. |
 | Yes | No | Anyone can use AI features funded by your key, **uncapped**. Only reasonable for a private/invite-only deploy. |
 | Yes | Yes | Free tier funded by your key up to the per-user monthly cap, then AI features 429 until the user adds their own key (or the month resets). |
 
 Whichever shape you pick, also set a **hard spend limit in your OpenAI
-dashboard** (platform.openai.com → Settings → Limits) as a backstop —
-`MONTHLY_AI_BUDGET_USD` only throttles calls this app makes; it can't protect
-against a bug or a key leaked some other way.
+dashboard** (platform.openai.com, under Settings then Limits) as a backstop.
+`MONTHLY_AI_BUDGET_USD` only throttles calls this app makes. It can't
+protect you against a bug, or a key that leaks some other way.
 
 ### The cross-domain cookie gotcha
 
 The refresh token and CSRF token live in httpOnly cookies scoped to
-`/api/auth`. If your frontend and backend end up on genuinely different
-registrable domains — the common free-tier shape of a Vercel frontend plus a
-Render/Railway/Fly backend on their own `*.vercel.app` / `*.onrender.com`
-domains — the default `SameSite=Lax` means browsers silently drop those
-cookies on cross-site requests, and users get logged out the moment their
-15-minute access token expires. Fix it with one env var:
+`/api/auth`. Problems show up if your frontend and backend end up on
+genuinely different registrable domains. That's the common free-tier setup:
+a Vercel frontend plus a Render, Railway or Fly backend on its own
+`*.vercel.app` or `*.onrender.com` domain. The default `SameSite=Lax` means
+browsers silently drop those cookies on cross-site requests. Users then get
+logged out the moment their 15-minute access token expires. Fix it with one
+env var:
 
 ```
 COOKIE_SAME_SITE=none
 ```
 
-(requires HTTPS, which every mainstream host gives you by default). If
-instead you put the frontend and backend on subdomains of the same
-registrable domain (e.g. `app.example.com` + `api.example.com`), the default
-`lax` is fine as-is — that's still "same-site" as far as cookies are
+This needs HTTPS, which every mainstream host gives you by default. If you
+instead put the frontend and backend on subdomains of the same registrable
+domain, like `app.example.com` and `api.example.com`, the default `lax` is
+fine as is. That still counts as "same-site" as far as cookies are
 concerned.
+
+### One-click API deploy on Render
+
+[`render.yaml`](render.yaml) is a [Render Blueprint](https://render.com/docs/blueprint-spec).
+Connect this repo from the Render dashboard through **New +** then
+**Blueprint**, and it provisions the API as a Docker web service built from
+[`backend/Dockerfile`](backend/Dockerfile). It comes with
+`NODE_ENV=production`, `COOKIE_SAME_SITE=none` and `OPENAI_MODEL=gpt-4o-mini`
+preset, and `GET /health` wired up as the health check. Anything secret or
+deployment-specific is marked `sync: false`: `MONGO_URI`, `JWT_SECRET`,
+`ENCRYPTION_KEY`, `CLIENT_URL`, `OPENAI_API_KEY`, `MONTHLY_AI_BUDGET_USD` and
+`ADMIN_EMAILS`. Render prompts you for each one once in its dashboard
+instead of storing it in the file or in git history. The blueprint only
+provisions the API. Build and host the frontend separately, on Vercel or
+Netlify for example, or with `docker-compose.yml` below, and point
+`CLIENT_URL` and `VITE_API_BASE_URL` at each other.
 
 ### Everything else
 
-- Set `NODE_ENV=production` — it turns on `trust proxy` (needed for accurate
-  rate limiting/lockout behind any platform's reverse proxy), `Secure`
+- Set `NODE_ENV=production`. It turns on `trust proxy` (needed for accurate
+  rate limiting and lockout behind any platform's reverse proxy), `Secure`
   cookies, and CORS restricted to `CLIENT_URL`.
 - Set `ENCRYPTION_KEY` explicitly (see `backend/.env.example`) rather than
   relying on the `JWT_SECRET`-derived dev fallback.
-- Uploaded PDFs are still stored on local disk
-  (`backend/uploads/`) — most PaaS hosts wipe that on every redeploy. The app
-  degrades gracefully (a document whose file was wiped shows a clear banner
-  instead of a broken viewer; chat/flashcards/quiz keep working since the
-  extracted text lives in MongoDB, not on disk) but the PDF itself is gone
-  until re-uploaded. Swap in S3/R2 for real persistence if that matters for
+- Uploaded PDFs are still stored on local disk (`backend/uploads/`). Most
+  PaaS hosts wipe that on every redeploy. The app handles this gracefully: a
+  document whose file was wiped shows a clear banner instead of a broken
+  viewer, and chat, flashcards and quizzes keep working since the extracted
+  text lives in MongoDB, not on disk. The PDF itself is gone until you
+  re-upload it. Swap in S3 or R2 for real persistence if that matters for
   your deploy.
-- `docker-compose.yml` runs the whole stack (Mongo, API, and the built
-  frontend behind nginx) in one command for a self-hosted deploy — see the
+- `docker-compose.yml` runs the whole stack (Mongo, the API, and the built
+  frontend behind nginx) in one command for a self-hosted deploy. See the
   file for which env vars it forwards.
 
 ## Notes
 
 - AI routes are rate limited to 30 requests per 15 minutes per user. They
-  also block documents with no extractable text at all — a scanned/image-only
-  PDF now falls back to OCR at upload time (`OCR_MAX_PAGES`, default 25 pages,
-  since OCR is synchronous and runs during the upload request), so it only
-  blocks AI features if OCR itself finds nothing to read.
+  also block documents with no extractable text at all. A scanned or
+  image-only PDF falls back to OCR at upload time (`OCR_MAX_PAGES`, default
+  25 pages, since OCR is synchronous and runs during the upload request). So
+  AI features only get blocked if OCR itself finds nothing to read.
 - Every AI call is logged with its token usage and an estimated cost. Spend
-  against the deployer's own shared `OPENAI_API_KEY` (never a user's own saved
-  key — see Deployment) can be capped per user per month with
-  `MONTHLY_AI_BUDGET_USD` (unset = no cap).
+  against the deployer's own shared `OPENAI_API_KEY` can be capped per user
+  per month with `MONTHLY_AI_BUDGET_USD` (leave it unset for no cap). This
+  never applies to a user's own saved key. See Deployment.
 - Quiz answer keys are never sent to the client until a quiz is submitted.
   Grading happens on the server.
-- Login/register/refresh are rate limited to 20 requests per 15 minutes per
-  IP, and an account locks itself out for 15 minutes after 5 consecutive
-  wrong passwords — both blunt email enumeration and credential stuffing.
-  Locked-out and nonexistent-user logins return the identical "Invalid email
-  or password" response so neither leaks which emails are registered.
-- Auth uses a short-lived (15 min) access token returned in the response body
-  plus a 7-day refresh token in an httpOnly cookie; `POST /api/auth/refresh`
-  rotates both and checks a server-side record
-  ([`models/RefreshToken.js`](backend/models/RefreshToken.js)) for reuse —
-  replaying an already-rotated-away token revokes every token descended from
-  that login, not just the one that got reused. Logout revokes it too, not
-  just the browser cookie. A stolen access token is only useful for minutes;
-  the refresh token never touches JavaScript-readable storage.
+- Login, register and refresh are rate limited to 20 requests per 15 minutes
+  per IP. An account locks itself out for 15 minutes after 5 consecutive
+  wrong passwords. Together these blunt both email enumeration and
+  credential stuffing. A locked-out login and a login for an email that
+  doesn't exist return the identical "Invalid email or password" response,
+  so neither one leaks which emails are registered.
+- Auth uses a short-lived access token (15 minutes), returned in the
+  response body, plus a 7-day refresh token in an httpOnly cookie. `POST
+  /api/auth/refresh` rotates both and checks a server-side record
+  ([`models/RefreshToken.js`](backend/models/RefreshToken.js)) for reuse.
+  Replaying a token that already got rotated away revokes every token
+  descended from that login, not just the one that got reused. Logout
+  revokes it too, not just the browser cookie. A stolen access token is only
+  useful for a few minutes. The refresh token never touches
+  JavaScript-readable storage.
 - Uploaded files are stored on local disk under `backend/uploads/`. For a
-  production deploy with an ephemeral filesystem, swap in S3 or Cloudinary —
-  until then, a document whose file was wiped by a redeploy shows a "file no
-  longer available" banner instead of a broken viewer (chat/flashcards/quiz
-  still work since the extracted text is stored in MongoDB, not on disk).
-- `GET /health` is a liveness check; `GET /ready` also verifies MongoDB is
-  connected — point an orchestrator's readiness probe at the latter.
-- Set `ADMIN_EMAILS` (comma-separated) to unlock a read-only cost dashboard at
-  `/admin/costs` — spend and token usage per user per day, from the `LlmCall`
-  ledger. It's an allowlist check on every request, not a stored role, so
-  granting/revoking access is just an env var change.
-- CI runs backend/frontend tests, `npm audit --audit-level=high` on both,
-  CodeQL static analysis, and the Playwright E2E suite against a real
-  backend + ephemeral in-memory MongoDB — see
+  production deploy with an ephemeral filesystem, swap in S3 or Cloudinary.
+  Until then, a document whose file was wiped by a redeploy shows a "file no
+  longer available" banner instead of a broken viewer. Chat, flashcards and
+  quizzes still work since the extracted text is stored in MongoDB, not on
+  disk.
+- `GET /health` is a liveness check. `GET /ready` also verifies MongoDB is
+  connected. Point an orchestrator's readiness probe at `/ready`.
+- Set `ADMIN_EMAILS` (comma-separated) to unlock a read-only cost dashboard
+  at `/admin/costs`. It shows spend and token usage per user per day, from
+  the `LlmCall` ledger. Access is an allowlist check on every request, not a
+  stored role, so granting or revoking it is just an env var change.
+- CI runs backend and frontend tests, `npm audit --audit-level=high` on
+  both, CodeQL static analysis, and the Playwright E2E suite against a real
+  backend with an ephemeral in-memory MongoDB. See
   [.github/workflows/ci.yml](.github/workflows/ci.yml).

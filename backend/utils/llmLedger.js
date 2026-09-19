@@ -1,12 +1,22 @@
 import LlmCall from "../models/LlmCall.js";
 import { getActiveKeySource } from "./aiContext.js";
 import { logger } from "./logger.js";
+import { recordLlmMetrics, cacheHits } from "./metrics.js";
 
 // usageInfo is whatever aiClient.generate()'s onUsage callback captured:
 // { costUsd, usage, model, latencyMs }. There's nothing to record if the
 // call never reached the provider (e.g. it failed before completion).
 export const recordLlmCall = async (userId, requestId, feature, usageInfo) => {
   if (!usageInfo) return;
+
+  recordLlmMetrics({
+    feature,
+    model: usageInfo.model,
+    keySource: getActiveKeySource() || "shared",
+    usage: usageInfo.usage,
+    costUsd: usageInfo.costUsd,
+    latencyMs: usageInfo.latencyMs,
+  });
 
   await LlmCall.create({
     user: userId,
@@ -25,6 +35,7 @@ export const recordLlmCall = async (userId, requestId, feature, usageInfo) => {
 // Best-effort, unlike recordLlmCall: this runs on the cache-hit fast path, and
 // a failed metrics write shouldn't turn a served-from-cache reply into an error.
 export const recordCacheHit = async (userId, requestId, feature, latencyMs = null) => {
+  cacheHits.inc({ feature });
   try {
     await LlmCall.create({
       user: userId,

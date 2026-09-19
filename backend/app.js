@@ -7,6 +7,8 @@ import cookieParser from "cookie-parser";
 
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 import { requestId } from "./middlewares/requestId.js";
+import { metricsMiddleware, metricsAuth, metricsHandler, circuitState } from "./utils/metrics.js";
+import { providerBreaker } from "./utils/circuitBreaker.js";
 import { isDraining } from "./utils/gracefulShutdown.js";
 import { UPLOAD_DIR } from "./middlewares/uploadMiddleware.js";
 import { httpLogger } from "./utils/logger.js";
@@ -34,6 +36,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 app.use(requestId);
+app.use(metricsMiddleware);
 app.use(httpLogger);
 // This server only ever returns JSON and PDF bytes — never HTML a browser
 // should render or run scripts from — so its CSP can be "nothing at all".
@@ -83,6 +86,12 @@ app.get("/ready", (req, res) => {
     status: ready ? "ready" : "not ready",
     checks: { mongo: dbReady ? "ok" : "unavailable", draining: isDraining() },
   });
+});
+
+// Scrape target for Prometheus. Guarded — see metricsAuth.
+app.get("/metrics", metricsAuth, (req, res, next) => {
+  circuitState.set(providerBreaker.getState() === "open" ? 1 : 0);
+  metricsHandler(req, res).catch(next);
 });
 
 app.use("/api/auth", authRoutes);

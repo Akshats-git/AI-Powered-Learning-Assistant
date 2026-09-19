@@ -14,7 +14,7 @@ const formatPageRange = (page, endPage) => {
   return page === endPage || endPage == null ? `p. ${page}` : `p. ${page}–${endPage}`;
 };
 
-const ChatSources = ({ sources, groundedness }) => {
+const ChatSources = ({ sources, groundedness, onOpenPage }) => {
   const [expanded, setExpanded] = useState(false);
   const hasSources = sources && sources.length > 0;
   // `grounded` is only ever explicitly false when verification actually ran
@@ -69,6 +69,16 @@ const ChatSources = ({ sources, groundedness }) => {
                         <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">{exactPage || pageRange}</span>
                       )}
                       {exactPage && pageRange && pageRange !== exactPage && <span className="text-gray-400">in {pageRange}</span>}
+                      {onOpenPage && (source.snippetPage ?? source.page) != null && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenPage(source.snippetPage ?? source.page)}
+                          aria-label={`Open page ${source.snippetPage ?? source.page} in the document`}
+                          className="ml-auto text-primary hover:underline"
+                        >
+                          Open in document
+                        </button>
+                      )}
                       {source.sectionPath?.length > 0 && <span>{source.sectionPath.join(" > ")}</span>}
                     </div>
                     <p className="mt-1 text-gray-500">{source.snippet}</p>

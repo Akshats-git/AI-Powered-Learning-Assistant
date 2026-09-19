@@ -1,11 +1,14 @@
 import { ExternalLink } from "lucide-react";
 
-const ContentTab = ({ document }) => {
+// `page` (optional) opens the viewer on that page — used when a chat citation is clicked.
+// The browser's built-in PDF viewer honours a #page=N fragment.
+const ContentTab = ({ document, page = null }) => {
   const fileUrl = `${import.meta.env.VITE_API_BASE_URL}${document.fileUrl}`;
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-      <div className="flex items-center justify-end px-4 py-2.5 border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+        <span className="text-xs text-gray-500">{page ? `Showing page ${page}` : ""}</span>
         <a
           href={fileUrl}
           target="_blank"
@@ -15,7 +18,8 @@ const ContentTab = ({ document }) => {
           Open in new tab <ExternalLink className="w-3.5 h-3.5" />
         </a>
       </div>
-      <iframe title={document.title} src={fileUrl} className="w-full h-[75vh]" />
+      {/* Keyed by page: changing only the #fragment doesn't make a PDF viewer scroll, remounting does. */}
+      <iframe key={page ?? "top"} title={document.title} src={page ? `${fileUrl}#page=${page}` : fileUrl} className="w-full h-[75vh]" />
     </div>
   );
 };

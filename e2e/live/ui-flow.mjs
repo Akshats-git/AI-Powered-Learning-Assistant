@@ -164,6 +164,14 @@ await step(page, "Chat: ask a question -> markdown answer with 'N sources' + pag
   expect(!/6 sources/.test(txt), "irrelevant chunks should not all be listed as sources");
   await shot("07-chat-citations");
 });
+await step(page, "Chat: clicking a citation jumps the PDF viewer to that exact page", async () => {
+  await page.getByRole("button", { name: "Open page 22 in the document" }).click();
+  await page.getByText("Showing page 22").waitFor();
+  const src = await page.locator("iframe").getAttribute("src");
+  expect(/#page=22$/.test(src), `iframe should target page 22, got ${src}`);
+  await tab("Chat").click();
+  await page.getByText(/bounded monotone sequence/i).first().waitFor();
+});
 await step(page, "Chat: hallucinated reply shows the 'not fully supported' warning", async () => {
   await page.getByPlaceholder(/Ask a question/).fill("Tell me about the Krebs moon");
   await page.getByRole("button", { name: "Send", exact: true }).click();

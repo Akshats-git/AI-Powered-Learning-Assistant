@@ -23,6 +23,7 @@ const DocumentDetailPage = () => {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("content");
+  const [pdfPage, setPdfPage] = useState(null);
   usePageTitle(document?.title);
 
   useEffect(() => {
@@ -111,8 +112,17 @@ const DocumentDetailPage = () => {
         ))}
       </div>
 
-      {activeTab === "content" && <ContentTab document={document} />}
-      {activeTab === "chat" && <ChatTab documentId={document._id} />}
+      {activeTab === "content" && <ContentTab document={document} page={pdfPage} />}
+      {activeTab === "chat" && (
+        <ChatTab
+          documentId={document._id}
+          // A citation chip is a link into the document: jump the viewer to that page.
+          onOpenPage={(page) => {
+            setPdfPage(page);
+            setActiveTab("content");
+          }}
+        />
+      )}
       {activeTab === "ai-actions" && <AIActionsTab documentId={document._id} />}
       {activeTab === "flashcards" && <FlashcardsTab documentId={document._id} />}
       {activeTab === "quizzes" && <QuizzesTab documentId={document._id} />}

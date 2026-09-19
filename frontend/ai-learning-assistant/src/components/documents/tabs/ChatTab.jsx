@@ -6,7 +6,7 @@ import { getChatHistory, streamChatMessage } from "../../../services/aiService";
 import MarkdownRenderer from "../../ui/MarkdownRenderer";
 import ChatSources from "./ChatSources";
 
-const ChatTab = ({ documentId }) => {
+const ChatTab = ({ documentId, onOpenPage }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
@@ -88,7 +88,7 @@ const ChatTab = ({ documentId }) => {
                   <MarkdownRenderer content={m.content} />
                 )}
               </div>
-              {m.role === "assistant" && <ChatSources sources={m.sources} groundedness={m.groundedness} />}
+              {m.role === "assistant" && <ChatSources sources={m.sources} groundedness={m.groundedness} onOpenPage={onOpenPage} />}
             </div>
           ))
         )}

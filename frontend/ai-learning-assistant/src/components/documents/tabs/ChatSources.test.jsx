@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import ChatSources from "./ChatSources";
 
 const SOURCES = [
@@ -56,6 +56,24 @@ describe("ChatSources", () => {
 
     expect(screen.getByText("p. 7")).toBeInTheDocument();
     expect(screen.queryByText(/^in p\./)).not.toBeInTheDocument();
+  });
+
+  it("offers an 'Open in document' action per source that jumps to its exact page", async () => {
+    const onOpenPage = vi.fn();
+    render(<ChatSources sources={[{ chunkId: "c6", page: 21, endPage: 23, snippetPage: 22, sectionPath: [], snippet: "Theorem." }, { chunkId: "c7", page: 9, endPage: 10, sectionPath: [], snippet: "Range only." }]} onOpenPage={onOpenPage} />);
+    await userEvent.click(screen.getByRole("button", { name: /2 sources/i }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Open page 22 in the document" }));
+    expect(onOpenPage).toHaveBeenLastCalledWith(22);
+    // No exact page known: falls back to the start of the chunk's range.
+    await userEvent.click(screen.getByRole("button", { name: "Open page 9 in the document" }));
+    expect(onOpenPage).toHaveBeenLastCalledWith(9);
+  });
+
+  it("shows no open action without a handler, or for a source with no page at all", async () => {
+    render(<ChatSources sources={[{ chunkId: "c8", page: null, endPage: null, sectionPath: [], snippet: "No page." }]} onOpenPage={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /1 source/i }));
+    expect(screen.queryByRole("button", { name: /open page/i })).not.toBeInTheDocument();
   });
 
   it("collapses again on a second click", async () => {

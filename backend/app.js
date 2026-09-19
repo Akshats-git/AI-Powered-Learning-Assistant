@@ -88,7 +88,10 @@ app.get("/ready", (req, res) => {
   const ready = dbReady && !isDraining();
   res.status(ready ? 200 : 503).json({
     status: ready ? "ready" : "not ready",
-    checks: { mongo: dbReady ? "ok" : "unavailable", draining: isDraining() },
+    // "degraded" is informational, NOT a readiness failure: with the LLM provider
+    // down, uploads, reading, reviewing and every non-AI page still work, so
+    // pulling the whole API out of rotation would turn a partial outage total.
+    checks: { mongo: dbReady ? "ok" : "unavailable", llm: providerBreaker.getState() === "open" ? "degraded" : "ok", draining: isDraining() },
   });
 });
 

@@ -16,3 +16,23 @@ describe("health and readiness", () => {
     expect(res.body.checks.mongo).toBe("ok");
   });
 });
+
+describe("GET /ready — LLM provider state", () => {
+  it("reports the LLM as ok normally", async () => {
+    const res = await request(app).get("/ready");
+    expect(res.status).toBe(200);
+    expect(res.body.checks.llm).toBe("ok");
+  });
+
+  it("reports 'degraded' while the circuit breaker is open, but stays READY (only AI features are down)", async () => {
+    const { providerBreaker } = await import("../utils/circuitBreaker.js");
+    const trip = () => providerBreaker.run(() => Promise.reject(Object.assign(new Error("down"), { status: 503 }))).catch(() => {});
+    for (let i = 0; i < 5; i += 1) await trip();
+    expect(providerBreaker.getState()).toBe("open");
+
+    const res = await request(app).get("/ready");
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ready");
+    expect(res.body.checks.llm).toBe("degraded");
+  });
+});

@@ -8,9 +8,7 @@
     "avgSources": 1.52,
     "answerRate": 1,
     "refusalRate": 0,
-    "ungroundedFlagRate": 0,
-    "latencyP50Ms": 27,
-    "latencyP95Ms": 30
+    "ungroundedFlagRate": 0
   },
   "byCategory": {
     "numeric": {
@@ -22,9 +20,7 @@
       "avgSources": 1.4,
       "answerRate": 1,
       "refusalRate": null,
-      "ungroundedFlagRate": 0,
-      "latencyP50Ms": 26,
-      "latencyP95Ms": 36
+      "ungroundedFlagRate": 0
     },
     "who": {
       "questions": 25,
@@ -35,9 +31,7 @@
       "avgSources": 1.4,
       "answerRate": 1,
       "refusalRate": null,
-      "ungroundedFlagRate": 0,
-      "latencyP50Ms": 27,
-      "latencyP95Ms": 29
+      "ungroundedFlagRate": 0
     },
     "when": {
       "questions": 25,
@@ -48,9 +42,7 @@
       "avgSources": 1.4,
       "answerRate": 1,
       "refusalRate": null,
-      "ungroundedFlagRate": 0,
-      "latencyP50Ms": 27,
-      "latencyP95Ms": 29
+      "ungroundedFlagRate": 0
     },
     "unanswerable": {
       "questions": 25,
@@ -61,9 +53,7 @@
       "avgSources": 1.88,
       "answerRate": null,
       "refusalRate": 0,
-      "ungroundedFlagRate": 0,
-      "latencyP50Ms": 28,
-      "latencyP95Ms": 30
+      "ungroundedFlagRate": 0
     }
   },
   "misses": []

@@ -113,14 +113,14 @@ const byCategory = Object.fromEntries([...new Set(rows.map((r) => r.category))].
 
 const fmt = (v, isPct = true) => (v == null ? "n/a" : isPct ? `${(v * 100).toFixed(1)}%` : typeof v === "number" ? v.toFixed(1) : v);
 const table = (name, m) =>
-  `| ${name} | ${m.questions} | ${fmt(m.hitRate)} | ${fmt(m.exactPageRate)} | ${fmt(m.citationPrecision)} | ${fmt(m.answerRate)} | ${fmt(m.refusalRate)} | ${fmt(m.avgSources, false)} | ${fmt(m.latencyP95Ms, false)} |`;
+  `| ${name} | ${m.questions} | ${fmt(m.hitRate)} | ${fmt(m.exactPageRate)} | ${fmt(m.citationPrecision)} | ${fmt(m.answerRate)} | ${fmt(m.refusalRate)} | ${fmt(m.avgSources, false)} |`;
 
 const report = `# RAG eval — provider: ${provider}
 
 ${rows.length} questions over ${new Set(rows.map((r) => r.id.split("-")[0])).size} documents (synthetic gold set — see e2e/evals/README.md for what it does and does not show).
 
-| Slice | Qs | Retrieval hit | Exact page | Citation precision | Answer contains | Refuses unanswerable | Avg sources | p95 ms |
-|---|---|---|---|---|---|---|---|---|
+| Slice | Qs | Retrieval hit | Exact page | Citation precision | Answer contains | Refuses unanswerable | Avg sources |
+|---|---|---|---|---|---|---|---|
 ${table("**overall**", overall)}
 ${Object.entries(byCategory).map(([c, m]) => table(c, m)).join("\n")}
 
@@ -135,7 +135,10 @@ fs.mkdirSync(path.join(HERE, "results"), { recursive: true });
 fs.writeFileSync(path.join(HERE, "results", `${provider}.md`), report);
 // Every answerable question that missed on any axis, so a drop is diagnosable, not just a number.
 const misses = rows.filter((r) => r.answerable && (!r.hit || !r.exactPage || !r.answered)).map((r) => ({ id: r.id, category: r.category, hit: r.hit, exactPage: r.exactPage, answered: r.answered, sources: r.sources }));
-fs.writeFileSync(path.join(HERE, "results", `${provider}.json`), JSON.stringify({ overall, byCategory, misses }, null, 2) + "\n");
+// Latency varies run to run, so it is printed but not written to the committed results (they'd differ on every run).
+const stable = ({ latencyP50Ms, latencyP95Ms, ...rest }) => rest;
+fs.writeFileSync(path.join(HERE, "results", `${provider}.json`), JSON.stringify({ overall: stable(overall), byCategory: Object.fromEntries(Object.entries(byCategory).map(([k, v]) => [k, stable(v)])), misses }, null, 2) + "\n");
+console.log(`latency p50/p95: ${overall.latencyP50Ms}ms / ${overall.latencyP95Ms}ms`);
 console.log(`\n\n${report}`);
 
 if (args.has("--update-baseline")) {

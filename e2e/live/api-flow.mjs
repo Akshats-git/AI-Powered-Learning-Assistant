@@ -59,7 +59,7 @@ try {
     check("helmet: X-Content-Type-Options nosniff", r.headers.get("x-content-type-options") === "nosniff");
     check("helmet: HSTS header present", !!r.headers.get("strict-transport-security"));
     const csp = r.headers.get("content-security-policy");
-    note("Content-Security-Policy header", csp ? `present: ${csp.slice(0, 80)}` : "ABSENT (roadmap Part 0 #3 - known open, needs pdf.js)");
+    check("API sends a deny-all Content-Security-Policy", /default-src 'none'/.test(csp || "") && /frame-ancestors 'none'/.test(csp || ""), csp);
     const okCors = await fetch(`${main.base}/health`, { headers: { origin: CLIENT_URL } });
     check("CORS allows CLIENT_URL with credentials", okCors.headers.get("access-control-allow-origin") === CLIENT_URL && okCors.headers.get("access-control-allow-credentials") === "true");
     const badCors = await fetch(`${main.base}/health`, { headers: { origin: "https://evil.example" } });
@@ -146,7 +146,7 @@ try {
 
     const file = await fetch(main.base + docA.fileUrl);
     check("served PDF at fileUrl: 200 application/pdf", file.status === 200 && /pdf/.test(file.headers.get("content-type") || ""), `${file.status} ${file.headers.get("content-type")}`);
-    check("served PDF is iframe-embeddable (no X-Frame-Options: DENY)", file.headers.get("x-frame-options") == null);
+    check("served PDF is iframe-embeddable ONLY by the frontend origin (CSP frame-ancestors)", file.headers.get("x-frame-options") == null && file.headers.get("content-security-policy") === `frame-ancestors ${CLIENT_URL}`, `${file.headers.get("x-frame-options")} | ${file.headers.get("content-security-policy")}`);
 
     r = await A.req("GET", "/api/documents?limit=1000");
     check("list: paginated envelope {items,page,limit,total,totalPages}, limit clamped to 50", r.body.items && r.body.limit === 50 && r.body.total >= 1 && r.body.totalPages >= 1, JSON.stringify({ ...r.body, items: undefined }));

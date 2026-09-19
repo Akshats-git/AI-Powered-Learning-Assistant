@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { createRequire } from "module";
 import { Client, startBackend, BACKEND, ROOT, OUT, FAKE_PORT, sleep, makeUploadDir } from "./lib.mjs";
 import { makeDoc } from "./make-pdf.mjs";
@@ -36,12 +36,25 @@ const mongod = await MongoMemoryServer.create();
 globalThis.__mongoUri = mongod.getUri("ui");
 const fake = await startFake(FAKE_PORT);
 const be = await startBackend("ui", BACK_PORT, { CLIENT_URL: FRONT });
-const vite = spawn("npx", ["vite", "--port", "5811", "--strictPort", "--host", "127.0.0.1"], {
-  cwd: `${ROOT}/frontend/ai-learning-assistant`,
-  env: { ...process.env, VITE_API_BASE_URL: `http://127.0.0.1:${BACK_PORT}` },
-  stdio: "ignore",
-  detached: true, // own process group so we can kill vite (not just npx) on teardown
-});
+// UI_PROD=1 serves the production build (where the CSP <meta> is injected) instead of the dev server.
+const FRONT_DIR = `${ROOT}/frontend/ai-learning-assistant`;
+const FRONT_ENV = { ...process.env, VITE_API_BASE_URL: `http://127.0.0.1:${BACK_PORT}` };
+if (process.env.UI_PROD) {
+  const built = spawnSync("npx", ["vite", "build", "--outDir", path.join(OUT, "dist"), "--emptyOutDir"], { cwd: FRONT_DIR, env: FRONT_ENV, stdio: "ignore" });
+  if (built.status !== 0) throw new Error("frontend build failed");
+}
+const vite = spawn(
+  "npx",
+  process.env.UI_PROD
+    ? ["vite", "preview", "--outDir", path.join(OUT, "dist"), "--port", "5811", "--strictPort", "--host", "127.0.0.1"]
+    : ["vite", "--port", "5811", "--strictPort", "--host", "127.0.0.1"],
+  {
+    cwd: FRONT_DIR,
+    env: FRONT_ENV,
+    stdio: "ignore",
+    detached: true, // own process group so we can kill vite (not just npx) on teardown
+  }
+);
 for (let i = 0; i < 100; i += 1) { try { if ((await fetch(FRONT)).ok) break; } catch {} await sleep(200); }
 
 const pdfPath = path.join(OUT, "ui-doc.pdf");
@@ -373,6 +386,10 @@ await fake.stop();
 await mongod.stop();
 fs.rmSync(UPLOAD, { recursive: true, force: true });
 
+if (process.env.UI_PROD) {
+  const cspErrors = consoleErrors.filter((c) => /content security policy/i.test(c));
+  results.push({ name: "production build runs under its CSP with zero violations", ok: cspErrors.length === 0, detail: cspErrors.slice(0, 3).join(" | ") });
+}
 const failed = results.filter((r) => !r.ok);
 console.log(`\nUI TOTAL: ${results.length - failed.length} passed, ${failed.length} failed`);
 console.log(`page errors: ${pageErrors.length}`, [...new Set(pageErrors)].slice(0, 6));

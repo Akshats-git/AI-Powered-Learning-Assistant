@@ -35,9 +35,16 @@ if (process.env.NODE_ENV === "production") {
 
 app.use(requestId);
 app.use(httpLogger);
+// This server only ever returns JSON and PDF bytes — never HTML a browser
+// should render or run scripts from — so its CSP can be "nothing at all".
+// (It used to be switched off entirely so the PDF <iframe> could work; the
+// one route that needs framing gets its own narrower rule below instead.)
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: { "default-src": ["'none'"], "frame-ancestors": ["'none'"], "base-uri": ["'none'"], "form-action": ["'none'"] },
+    },
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
@@ -48,7 +55,10 @@ app.use(cookieParser());
 app.use(
   "/uploads",
   (req, res, next) => {
+    // Uploaded PDFs are shown in an <iframe> on the frontend's origin: allow
+    // framing by that origin only, instead of by anyone (or by no one).
     res.removeHeader("X-Frame-Options");
+    res.setHeader("Content-Security-Policy", `frame-ancestors ${process.env.CLIENT_URL || "'self'"}`);
     next();
   },
   // Same directory multer writes to — they used to be resolved differently

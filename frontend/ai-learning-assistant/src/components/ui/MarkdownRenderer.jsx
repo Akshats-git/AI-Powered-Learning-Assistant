@@ -1,7 +1,8 @@
+import { lazy, Suspense } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+
+const CodeBlock = lazy(() => import("./CodeBlock"));
 
 const components = {
   h1: (props) => <h1 className="text-lg font-bold text-gray-900 mt-4 mb-2 first:mt-0" {...props} />,
@@ -20,16 +21,14 @@ const components = {
     const { children, className, node, ...rest } = props;
     void node; // exclude react-markdown's internal AST node from the DOM props spread below
     const match = /language-(\w+)/.exec(className || "");
+    const code = String(children).replace(/\n$/, "");
     return match ? (
-      <SyntaxHighlighter
-        {...rest}
-        PreTag="div"
-        language={match[1]}
-        style={oneLight}
-        className="!mb-3 !text-xs !rounded-lg"
-      >
-        {String(children).replace(/\n$/, "")}
-      </SyntaxHighlighter>
+      // Plain preformatted text until the highlighter chunk arrives, so the code is readable immediately.
+      <Suspense fallback={<pre className="mb-3 overflow-x-auto rounded-lg bg-gray-50 p-3 text-xs">{code}</pre>}>
+        <CodeBlock {...rest} language={match[1]}>
+          {code}
+        </CodeBlock>
+      </Suspense>
     ) : (
       <code {...rest} className="px-1 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">
         {children}

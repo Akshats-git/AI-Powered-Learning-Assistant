@@ -109,6 +109,7 @@ await step(page, "register -> lands on /dashboard", async () => {
 });
 await step(page, "empty dashboard renders zeroed stat cards + empty state (no crash)", async () => {
   await page.getByText("Total Documents").waitFor();
+  expect((await page.title()) === "Dashboard · StudyAI", `route title should be set, got "${await page.title()}"`);
   await shot("03-dashboard-empty");
 });
 await step(page, "email-verification banner is shown to an unverified user", async () => {
@@ -143,6 +144,7 @@ await step(page, "document card opens details page with 5 tabs", async () => {
   await page.getByText("Biology & Math Reader").first().click();
   await page.waitForURL(/\/documents\/[a-f0-9]{24}$/);
   docUrl = page.url();
+  await page.waitForFunction(() => document.title === "Biology & Math Reader · StudyAI", null, { timeout: 5000 });
   for (const t of ["Content", "Chat", "AI Actions", "Flashcards", "Quizzes"]) await page.getByText(t, { exact: true }).first().waitFor();
 });
 await step(page, "Content tab embeds the PDF viewer (iframe) + 'open in new tab' link", async () => {

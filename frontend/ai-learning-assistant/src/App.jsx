@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 import { AuthProvider } from "./context/AuthContext";
@@ -6,24 +7,40 @@ import { useAuth } from "./hooks/useAuth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
+import ErrorBoundary from "./components/ui/ErrorBoundary";
+import { usePageTitle, titleForPath } from "./hooks/usePageTitle";
 
-import LoginPage from "./pages/Auth/LoginPage";
-import RegisterPage from "./pages/Auth/RegisterPage";
-import ForgotPasswordPage from "./pages/Auth/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/Auth/ResetPasswordPage";
-import VerifyEmailPage from "./pages/Auth/VerifyEmailPage";
-import DashboardPage from "./pages/Dashboard/DashboardPage";
-import DocumentListPage from "./pages/Documents/DocumentListPage";
-import DocumentDetailPage from "./pages/Documents/DocumentDetailPage";
-import FlashcardPage from "./pages/Flashcards/FlashcardPage";
-import FlashcardsListPage from "./pages/Flashcards/FlashcardsListPage";
-import ReviewSessionPage from "./pages/Review/ReviewSessionPage";
-import QuizzesListPage from "./pages/Quizzes/QuizzesListPage";
-import QuizTakePage from "./pages/Quizzes/QuizTakePage";
-import QuizResultPage from "./pages/Quizzes/QuizResultPage";
-import ProfilePage from "./pages/Profile/ProfilePage";
-import AdminCostDashboardPage from "./pages/Admin/AdminCostDashboardPage";
-import NotFoundPage from "./pages/NotFoundPage";
+const LoginPage = lazy(() => import("./pages/Auth/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/Auth/RegisterPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/Auth/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/Auth/ResetPasswordPage"));
+const VerifyEmailPage = lazy(() => import("./pages/Auth/VerifyEmailPage"));
+const DashboardPage = lazy(() => import("./pages/Dashboard/DashboardPage"));
+const DocumentListPage = lazy(() => import("./pages/Documents/DocumentListPage"));
+const DocumentDetailPage = lazy(() => import("./pages/Documents/DocumentDetailPage"));
+const FlashcardPage = lazy(() => import("./pages/Flashcards/FlashcardPage"));
+const FlashcardsListPage = lazy(() => import("./pages/Flashcards/FlashcardsListPage"));
+const ReviewSessionPage = lazy(() => import("./pages/Review/ReviewSessionPage"));
+const QuizzesListPage = lazy(() => import("./pages/Quizzes/QuizzesListPage"));
+const QuizTakePage = lazy(() => import("./pages/Quizzes/QuizTakePage"));
+const QuizResultPage = lazy(() => import("./pages/Quizzes/QuizResultPage"));
+const ProfilePage = lazy(() => import("./pages/Profile/ProfilePage"));
+const AdminCostDashboardPage = lazy(() => import("./pages/Admin/AdminCostDashboardPage"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+
+const PageLoader = () => (
+  <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-live="polite">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-primary" />
+    <span className="sr-only">Loading page</span>
+  </div>
+);
+
+// Title for every static route; dynamic pages (a document) override it themselves.
+const RouteTitle = () => {
+  const { pathname } = useLocation();
+  usePageTitle(titleForPath(pathname));
+  return null;
+};
 
 const RootRedirect = () => {
   const { user, loading } = useAuth();
@@ -103,11 +120,19 @@ const AppRoutes = () => (
   </Routes>
 );
 
+// Outermost boundary: if something above a page breaks (the layout itself), the
+// user still gets a message instead of a blank screen. Pages get their own,
+// keyed by route, in DashboardLayout.
 const App = () => (
   <Router>
     <AuthProvider>
       <Toaster position="top-center" />
-      <AppRoutes />
+      <RouteTitle />
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <AppRoutes />
+        </Suspense>
+      </ErrorBoundary>
     </AuthProvider>
   </Router>
 );

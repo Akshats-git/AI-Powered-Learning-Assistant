@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import ErrorBoundary from "../ui/ErrorBoundary";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import VerifyEmailBanner from "./VerifyEmailBanner";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { pathname } = useLocation();
 
   return (
     <div className="min-h-screen flex bg-[#F9FAFB]">
@@ -15,7 +17,10 @@ const DashboardLayout = () => {
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 p-4 sm:p-6">
           <VerifyEmailBanner />
-          <Outlet />
+          {/* A crash inside one page keeps the sidebar and navbar alive, and clears on navigation. */}
+          <ErrorBoundary resetKey={pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

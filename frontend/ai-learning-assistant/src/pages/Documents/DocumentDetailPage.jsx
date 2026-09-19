@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, Info } from "lucide-react";
 
+import { usePageTitle } from "../../hooks/usePageTitle";
 import { getDocument } from "../../services/documentService";
 import ContentTab from "../../components/documents/tabs/ContentTab";
 import ChatTab from "../../components/documents/tabs/ChatTab";
@@ -22,6 +23,7 @@ const DocumentDetailPage = () => {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("content");
+  usePageTitle(document?.title);
 
   useEffect(() => {
     let ignore = false;

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { Send, Square } from "lucide-react";
+import toast from "react-hot-toast";
 
-import { getChatHistory, sendChatMessage } from "../../../services/aiService";
+import { getChatHistory, streamChatMessage } from "../../../services/aiService";
 import MarkdownRenderer from "../../ui/MarkdownRenderer";
 import ChatSources from "./ChatSources";
 
@@ -11,6 +12,10 @@ const ChatTab = ({ documentId }) => {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
+  const abortRef = useRef(null);
+
+  // Leaving the tab mid-answer stops the generation server-side too.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     getChatHistory(documentId)
@@ -27,23 +32,40 @@ const ChatTab = ({ documentId }) => {
     const text = input.trim();
     if (!text || sending) return;
 
-    setMessages((prev) => [...prev, { role: "user", content: text, timestamp: new Date().toISOString() }]);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: text, timestamp: new Date().toISOString() },
+      { role: "assistant", content: "", streaming: true },
+    ]);
     setInput("");
     setSending(true);
 
+    const updateLast = (patch) =>
+      setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, ...(typeof patch === "function" ? patch(m) : patch) } : m)));
+
     try {
-      const res = await sendChatMessage(documentId, text);
-      setMessages(res.data.messages);
-    } catch {
-      // error toast handled by the axios response interceptor
+      const result = await streamChatMessage(documentId, text, {
+        signal: controller.signal,
+        onSources: (sources) => updateLast({ sources }),
+        onToken: (delta) => updateLast((m) => ({ content: m.content + delta })),
+      });
+      setMessages(result.messages);
+    } catch (err) {
+      // Drop the unfinished placeholder; the user's own message stays. A Stop click is not an error.
+      setMessages((prev) => prev.filter((m) => !m.streaming));
+      if (err.name !== "AbortError") toast.error(err.message || "Something went wrong");
     } finally {
+      abortRef.current = null;
       setSending(false);
     }
   };
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 flex flex-col h-[75vh]">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* role=log + aria-live: a screen reader announces the answer as it streams in. */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" role="log" aria-live="polite" aria-label="Conversation">
         {loading ? (
           <p className="text-sm text-gray-400 text-center mt-10">Loading conversation...</p>
         ) : messages.length === 0 ? (
@@ -51,7 +73,7 @@ const ChatTab = ({ documentId }) => {
             Ask a question about this document to get started.
           </p>
         ) : (
-          messages.map((m, i) => (
+          messages.filter((m) => !(m.streaming && !m.content)).map((m, i) => (
             <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
               <div
                 className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
@@ -71,7 +93,7 @@ const ChatTab = ({ documentId }) => {
           ))
         )}
 
-        {sending && (
+        {sending && !messages.some((m) => m.streaming && m.content) && (
           <div className="flex justify-start">
             <div className="rounded-2xl px-4 py-2.5 bg-white border border-gray-100 flex gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-bounce [animation-delay:-0.3s]" />
@@ -91,6 +113,16 @@ const ChatTab = ({ documentId }) => {
           placeholder="Ask a question about this document..."
           className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
         />
+        {sending && (
+          <button
+            type="button"
+            onClick={() => abortRef.current?.abort()}
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+            aria-label="Stop generating"
+          >
+            <Square className="w-4 h-4" />
+          </button>
+        )}
         <button
           type="submit"
           disabled={sending || !input.trim()}

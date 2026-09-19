@@ -26,6 +26,7 @@ export const API_PATHS = {
     SUMMARY: "/api/ai/summary",
     EXPLAIN: "/api/ai/explain",
     CHAT: "/api/ai/chat",
+    CHAT_STREAM: "/api/ai/chat/stream",
     CHAT_HISTORY: (documentId) => `/api/ai/chat-history/${documentId}`,
   },
   FLASHCARDS: {

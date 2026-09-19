@@ -156,6 +156,17 @@ export const startFake = (port) => {
         }
       }
       const content = respond(kind, prompt);
+      if (body.stream) {
+        res.writeHead(200, { "content-type": "text/event-stream" });
+        const words = content.split(/(?<= )/);
+        for (const w of words) {
+          res.write(`data: ${JSON.stringify({ id: "c", object: "chat.completion.chunk", model: body.model, choices: [{ index: 0, delta: { content: w } }] })}\n\n`);
+          await new Promise((r) => setTimeout(r, 15));
+        }
+        const usage = { prompt_tokens: Math.ceil(prompt.length / 4), completion_tokens: Math.ceil(content.length / 4), total_tokens: Math.ceil((prompt.length + content.length) / 4) };
+        res.write(`data: ${JSON.stringify({ id: "c", object: "chat.completion.chunk", model: body.model, choices: [], usage })}\n\ndata: [DONE]\n\n`);
+        return res.end();
+      }
       return send(200, {
         id: "chatcmpl-fake", object: "chat.completion", model: body.model,
         choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],

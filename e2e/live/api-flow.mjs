@@ -225,6 +225,19 @@ try {
     r = await chat(A, docA._id, "Explain the Treaty Heligoland concessions Germany");
     check("groundedness failure degrades gracefully (chat 200, verdict null)", r.status === 200 && (r.body.groundedness == null), `${r.status} ${JSON.stringify(r.body.groundedness)}`);
 
+    // ---- SSE streaming
+    {
+      const res = await fetch(`${main.base}/api/ai/chat/stream`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${A.token}` }, body: JSON.stringify({ documentId: docA._id, message: "Where does the Krebs cycle occur inside the cell?" }) });
+      const text = await res.text();
+      const events = [...text.matchAll(/^event: (\w+)$/gm)].map((m) => m[1]);
+      check("chat/stream answers as text/event-stream", res.status === 200 && /text\/event-stream/.test(res.headers.get("content-type") || ""), `${res.status} ${res.headers.get("content-type")}`);
+      check("stream order: sources -> tokens -> done", events[0] === "sources" && events.at(-1) === "done" && events.filter((e) => e === "token").length > 3, events.join(",").slice(0, 120));
+      const done = JSON.parse(/event: done\ndata: (.*)/.exec(text)?.[1] || "{}");
+      check("stream 'done' carries the full reply, sources and saved messages", done.reply?.includes("Krebs") && done.sources?.length >= 1 && done.messages?.length > 0, JSON.stringify(done).slice(0, 160));
+      const bad = await fetch(`${main.base}/api/ai/chat/stream`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${A.token}` }, body: JSON.stringify({ documentId: "a".repeat(24), message: "x" }) });
+      check("stream: a failure before the first event is plain JSON (404)", bad.status === 404 && /json/.test(bad.headers.get("content-type") || ""), `${bad.status} ${bad.headers.get("content-type")}`);
+    }
+
     const h = await A.req("GET", `/api/ai/chat-history/${docA._id}`);
     check("GET chat-history returns persisted messages (user+assistant pairs)", h.status === 200 && Array.isArray(h.body) && h.body.length >= 14 && h.body.length % 2 === 0, `${h.body.length}`);
     check("persisted assistant messages keep their sources", h.body.some((m) => m.role === "assistant" && m.sources?.length > 0));

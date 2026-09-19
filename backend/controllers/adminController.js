@@ -1,4 +1,7 @@
 import LlmCall from "../models/LlmCall.js";
+import AuditLog from "../models/AuditLog.js";
+import { AUDIT_EVENTS } from "../utils/audit.js";
+import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 
 const DEFAULT_DAYS = 30;
 const MAX_DAYS = 90;
@@ -102,6 +105,31 @@ export const getCostOverview = async (req, res, next) => {
       byDay,
       byUser,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Read-only view of the security audit trail, newest first. Optional
+// `?event=` filter (one of AUDIT_EVENTS) and the usual page/limit.
+export const listAuditLog = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = parsePagination(req.query);
+    const filter = {};
+    if (req.query.event) {
+      if (!AUDIT_EVENTS.includes(req.query.event)) {
+        res.status(400);
+        throw new Error(`Unknown event. One of: ${AUDIT_EVENTS.join(", ")}`);
+      }
+      filter.event = req.query.event;
+    }
+
+    const [items, total] = await Promise.all([
+      AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate("user", "email username").lean(),
+      AuditLog.countDocuments(filter),
+    ]);
+
+    res.status(200).json({ items, ...buildPageMeta(page, limit, total) });
   } catch (err) {
     next(err);
   }

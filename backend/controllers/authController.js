@@ -17,6 +17,7 @@ import { sendMail } from "../utils/mailer.js";
 import { issueCsrfToken, clearCsrfCookie, isCsrfTokenValid } from "../utils/csrf.js";
 import { encrypt } from "../utils/encryption.js";
 import { verifyOpenAiKey } from "../utils/verifyOpenAiKey.js";
+import { recordAudit, hashIdentifier } from "../utils/audit.js";
 
 const MAX_FAILED_ATTEMPTS = Number(process.env.ACCOUNT_LOCK_MAX_ATTEMPTS) || 5;
 const LOCK_DURATION_MS = (Number(process.env.ACCOUNT_LOCK_MINUTES) || 15) * 60 * 1000;
@@ -72,6 +73,7 @@ export const register = async (req, res, next) => {
     await sendVerificationEmail(user);
 
     const { accessToken, csrfToken } = await issueTokens(req, res, user);
+    await recordAudit(req, "register", { userId: user._id });
     res.status(201).json({ user: withIsAdmin(user), token: accessToken, csrfToken });
   } catch (err) {
     next(err);
@@ -88,6 +90,7 @@ export const login = async (req, res, next) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
+      await recordAudit(req, "login_failed", { meta: { emailHash: hashIdentifier(email), reason: "unknown_email" } });
       throw invalidCredentials();
     }
 
@@ -100,11 +103,15 @@ export const login = async (req, res, next) => {
     if (!passwordMatches) {
       if (!isLocked) {
         user.failedLoginAttempts += 1;
-        if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+        const justLocked = user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS;
+        if (justLocked) {
           user.lockUntil = new Date(Date.now() + LOCK_DURATION_MS);
           user.failedLoginAttempts = 0;
         }
         await user.save();
+        await recordAudit(req, justLocked ? "account_locked" : "login_failed", { userId: user._id, meta: { reason: "wrong_password" } });
+      } else {
+        await recordAudit(req, "login_failed", { userId: user._id, meta: { reason: "account_locked" } });
       }
       throw invalidCredentials();
     }
@@ -119,6 +126,7 @@ export const login = async (req, res, next) => {
     await user.save();
 
     const { accessToken, csrfToken } = await issueTokens(req, res, user);
+    await recordAudit(req, "login", { userId: user._id });
     res.status(200).json({ user: withIsAdmin(user), token: accessToken, csrfToken });
   } catch (err) {
     next(err);
@@ -170,6 +178,7 @@ export const refresh = async (req, res, next) => {
     // once one token from a chain has been reused, none of them can be trusted.
     const rotation = await rotateRefreshToken(decoded.jti, user._id);
     if (!rotation.ok) {
+      if (rotation.reason === "reused") await recordAudit(req, "refresh_reuse_detected", { userId: user._id });
       clearRefreshCookie(res);
       res.status(401);
       throw new Error(
@@ -201,6 +210,7 @@ export const logout = async (req, res, next) => {
       try {
         const decoded = verifyRefreshToken(token);
         if (decoded.familyId) await revokeFamily(decoded.familyId);
+        await recordAudit(req, "logout", { userId: decoded.id });
       } catch {
         // Already invalid/expired — nothing to revoke.
       }
@@ -272,6 +282,7 @@ export const revokeSession = async (req, res, next) => {
       clearCsrfCookie(res);
     }
 
+    await recordAudit(req, "session_revoked", { userId: req.user._id, meta: { familyId } });
     res.status(200).json({ message: "Session revoked" });
   } catch (err) {
     next(err);
@@ -287,6 +298,7 @@ export const forgotPassword = async (req, res, next) => {
     // anti-enumeration posture as login (see the comment there). Only send
     // mail, and only issue a token, when there's actually a user to reset.
     if (user) {
+      await recordAudit(req, "password_reset_requested", { userId: user._id });
       const token = await createResetToken(user._id);
       const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
       await sendMail({
@@ -322,6 +334,7 @@ export const resetPassword = async (req, res, next) => {
     // request that triggered it — otherwise a device an attacker was
     // already using stays logged in straight through the "fix."
     await revokeAllForUser(user._id);
+    await recordAudit(req, "password_reset", { userId: user._id });
 
     res.status(200).json({ message: "Password reset successfully. Please log in." });
   } catch (err) {
@@ -340,6 +353,7 @@ export const verifyEmail = async (req, res, next) => {
     }
 
     await User.updateOne({ _id: userId, emailVerifiedAt: null }, { $set: { emailVerifiedAt: new Date() } });
+    await recordAudit(req, "email_verified", { userId });
 
     res.status(200).json({ message: "Email verified" });
   } catch (err) {
@@ -382,6 +396,7 @@ export const updatePassword = async (req, res, next) => {
     // session is kept, so the user isn't logged out of the page they just
     // used to change it.
     await revokeAllExcept(user._id, currentFamilyId(req));
+    await recordAudit(req, "password_changed", { userId: user._id });
 
     res.status(200).json({ message: "Password updated successfully" });
   } catch (err) {
@@ -412,6 +427,7 @@ export const updateApiKey = async (req, res, next) => {
       { $set: { openaiApiKeyEncrypted: encrypt(apiKey), openaiApiKeyLast4 } }
     );
 
+    await recordAudit(req, "api_key_saved", { userId: req.user._id });
     res.status(200).json({ message: "API key saved", openaiApiKeyLast4 });
   } catch (err) {
     next(err);
@@ -425,6 +441,7 @@ export const removeApiKey = async (req, res, next) => {
       { $set: { openaiApiKeyEncrypted: null, openaiApiKeyLast4: null } }
     );
 
+    await recordAudit(req, "api_key_removed", { userId: req.user._id });
     res.status(200).json({ message: "API key removed" });
   } catch (err) {
     next(err);

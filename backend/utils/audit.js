@@ -5,6 +5,7 @@ import { logger } from "./logger.js";
 export const AUDIT_EVENTS = [
   "register",
   "login",
+  "demo_login",
   "login_failed",
   "account_locked",
   "logout",

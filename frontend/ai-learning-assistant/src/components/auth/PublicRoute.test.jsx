@@ -44,4 +44,10 @@ describe("PublicRoute", () => {
     renderAtLogin();
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
   });
+
+  it("lets the read-only demo visitor reach the public pages (sign in / register) instead of bouncing them to the dashboard", () => {
+    useAuth.mockReturnValue({ user: { isDemo: true }, loading: false });
+    renderAtLogin();
+    expect(screen.getByText("Login form")).toBeInTheDocument();
+  });
 });

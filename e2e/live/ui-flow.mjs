@@ -381,6 +381,44 @@ await step(page, "Non-admin visiting /admin/costs does not see spend data", asyn
   await shot("22-admin-nonadmin");
 });
 
+// ---- demo mode, in a brand-new browser context (no session, no storage)
+const demoCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const dp = await demoCtx.newPage();
+dp.setDefaultTimeout(8000);
+await step(dp, "demo: 'Try the demo' from the login page lands on a seeded dashboard, no signup", async () => {
+  await dp.goto(FRONT + "/login");
+  await dp.getByRole("button", { name: /try the demo/i }).click();
+  await dp.waitForURL("**/dashboard");
+  await dp.getByRole("note").getByText(/read-only demo/i).waitFor();
+  await dp.getByText("Weak Areas").waitFor();
+  await dp.getByText("Calvin cycle").first().waitFor();
+  await dp.screenshot({ path: path.join(SHOTS, "23-demo-dashboard.png"), fullPage: true });
+});
+await step(dp, "demo: the seeded document, its chat history with a cited page, and the deck are all there", async () => {
+  await dp.goto(FRONT + "/documents");
+  await dp.getByText("How Plants Turn Light Into Food (demo)").first().click();
+  await dp.waitForURL(/\/documents\/[a-f0-9]{24}$/);
+  await dp.getByRole("button", { name: "Chat", exact: true }).click();
+  await dp.getByText(/takes place in the/i).first().waitFor();
+  await dp.getByRole("button", { name: /1 source/ }).click();
+  await dp.getByText("p. 3").first().waitFor();
+  await dp.getByRole("button", { name: "Flashcards", exact: true }).click();
+  await dp.getByText("Photosynthesis basics").first().waitFor();
+});
+await step(dp, "demo: a write attempt is refused with a clear 'read-only' message and changes nothing", async () => {
+  await dp.getByRole("button", { name: "Chat", exact: true }).click();
+  await dp.getByPlaceholder(/Ask a question/).fill("hello?");
+  await dp.getByRole("button", { name: "Send", exact: true }).click();
+  await dp.getByText(/read-only/i).first().waitFor();
+  await dp.screenshot({ path: path.join(SHOTS, "24-demo-readonly.png") });
+});
+await step(dp, "demo: 'Create a free account' leaves the demo and opens registration", async () => {
+  await dp.goto(FRONT + "/dashboard");
+  await dp.getByRole("button", { name: /create a free account/i }).click();
+  await dp.waitForURL("**/register");
+});
+await demoCtx.close();
+
 await browser.close();
 try { process.kill(-vite.pid, "SIGTERM"); } catch {}
 await be.stop();

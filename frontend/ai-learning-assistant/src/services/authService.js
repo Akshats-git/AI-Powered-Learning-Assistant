@@ -3,6 +3,9 @@ import { API_PATHS } from "../utils/apiPaths";
 
 export const register = (data) => axiosInstance.post(API_PATHS.AUTH.REGISTER, data);
 
+// Signs in to the shared, seeded, read-only demo account — no signup.
+export const demoLogin = () => axiosInstance.post(API_PATHS.AUTH.DEMO);
+
 export const login = (data) => axiosInstance.post(API_PATHS.AUTH.LOGIN, data);
 
 // Reads the httpOnly refresh cookie server-side and mints a new access

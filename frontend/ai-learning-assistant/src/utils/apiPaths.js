@@ -2,6 +2,7 @@ export const API_PATHS = {
   AUTH: {
     REGISTER: "/api/auth/register",
     LOGIN: "/api/auth/login",
+    DEMO: "/api/auth/demo",
     REFRESH: "/api/auth/refresh",
     LOGOUT: "/api/auth/logout",
     PROFILE: "/api/auth/profile",

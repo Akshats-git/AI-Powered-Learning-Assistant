@@ -18,6 +18,7 @@ import { issueCsrfToken, clearCsrfCookie, isCsrfTokenValid } from "../utils/csrf
 import { encrypt } from "../utils/encryption.js";
 import { verifyOpenAiKey } from "../utils/verifyOpenAiKey.js";
 import { recordAudit, hashIdentifier } from "../utils/audit.js";
+import { ensureDemoAccount, isDemoEnabled } from "../utils/demoSeed.js";
 
 const MAX_FAILED_ATTEMPTS = Number(process.env.ACCOUNT_LOCK_MAX_ATTEMPTS) || 5;
 const LOCK_DURATION_MS = (Number(process.env.ACCOUNT_LOCK_MINUTES) || 15) * 60 * 1000;
@@ -127,6 +128,24 @@ export const login = async (req, res, next) => {
 
     const { accessToken, csrfToken } = await issueTokens(req, res, user);
     await recordAudit(req, "login", { userId: user._id });
+    res.status(200).json({ user: withIsAdmin(user), token: accessToken, csrfToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// "Try it without signing up": signs the visitor in to the shared, seeded,
+// read-only demo account. Disabled (404) unless demo mode is on — see isDemoEnabled.
+export const demoLogin = async (req, res, next) => {
+  try {
+    if (!isDemoEnabled()) {
+      res.status(404);
+      throw new Error("Demo mode is not enabled");
+    }
+
+    const user = await ensureDemoAccount();
+    const { accessToken, csrfToken } = await issueTokens(req, res, user);
+    await recordAudit(req, "demo_login", { userId: user._id });
     res.status(200).json({ user: withIsAdmin(user), token: accessToken, csrfToken });
   } catch (err) {
     next(err);

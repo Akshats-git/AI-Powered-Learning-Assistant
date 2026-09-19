@@ -31,6 +31,14 @@ export const AuthProvider = ({ children }) => {
     return res.data.user;
   };
 
+  const loginAsDemo = async () => {
+    const res = await authService.demoLogin();
+    localStorage.setItem(TOKEN_STORAGE_KEY, res.data.token);
+    localStorage.setItem(CSRF_TOKEN_STORAGE_KEY, res.data.csrfToken);
+    setUser(res.data.user);
+    return res.data.user;
+  };
+
   const register = async (data) => {
     const res = await authService.register(data);
     localStorage.setItem(TOKEN_STORAGE_KEY, res.data.token);
@@ -53,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginAsDemo, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

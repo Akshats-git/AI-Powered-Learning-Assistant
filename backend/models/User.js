@@ -10,6 +10,9 @@ const userSchema = new mongoose.Schema(
       month: { type: String, default: "" }, // "YYYY-MM"; resets the counter when it changes
       spendUsd: { type: Number, default: 0 },
     },
+    // The shared, read-only demo account (utils/demoSeed.js). Writes are refused
+    // for it in middlewares/authMiddleware.js.
+    isDemo: { type: Boolean, default: false },
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
     emailVerifiedAt: { type: Date, default: null },

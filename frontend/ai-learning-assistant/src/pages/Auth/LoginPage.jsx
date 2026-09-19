@@ -8,12 +8,13 @@ import { useAuth } from "../../hooks/useAuth";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const LoginPage = () => {
-  const { login } = useAuth();
+  const { login, loginAsDemo } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -30,6 +31,18 @@ const LoginPage = () => {
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleDemo = async () => {
+    setDemoLoading(true);
+    try {
+      await loginAsDemo();
+      navigate("/dashboard");
+    } catch {
+      // error toast is handled by the axios response interceptor
+    } finally {
+      setDemoLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -113,6 +126,20 @@ const LoginPage = () => {
           )}
         </button>
       </form>
+
+      <div className="mt-5 flex items-center gap-3 text-xs text-gray-400">
+        <span className="h-px flex-1 bg-gray-100" />
+        or
+        <span className="h-px flex-1 bg-gray-100" />
+      </div>
+      <button
+        type="button"
+        onClick={handleDemo}
+        disabled={submitting || demoLoading}
+        className="mt-5 w-full py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-60"
+      >
+        {demoLoading ? "Opening the demo..." : "Try the demo — no signup"}
+      </button>
 
       <p className="mt-6 text-center text-sm text-gray-500">
         Don't have an account?{" "}

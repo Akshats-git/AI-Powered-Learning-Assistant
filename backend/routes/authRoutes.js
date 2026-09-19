@@ -1,6 +1,7 @@
 import express from "express";
 import {
   register,
+  demoLogin,
   login,
   refresh,
   logout,
@@ -33,6 +34,7 @@ const router = express.Router();
 
 router.post("/register", authRateLimiter, validate(registerSchema), register);
 router.post("/login", authRateLimiter, validate(loginSchema), login);
+router.post("/demo", authRateLimiter, demoLogin);
 router.post("/refresh", authRateLimiter, refresh);
 router.post("/logout", logout);
 router.get("/profile", protect, getProfile);

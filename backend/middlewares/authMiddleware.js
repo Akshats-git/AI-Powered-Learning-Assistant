@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 export const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -27,6 +29,13 @@ export const protect = async (req, res, next) => {
     if (!user) {
       res.status(401);
       return next(new Error("Not authorized, user not found"));
+    }
+
+    // The shared demo account is look-but-don't-touch: any write would either cost
+    // money (AI calls) or change what the next visitor sees.
+    if (user.isDemo && !SAFE_METHODS.has(req.method)) {
+      res.status(403);
+      return next(new Error("The demo account is read-only — create a free account to try this."));
     }
 
     req.user = user;

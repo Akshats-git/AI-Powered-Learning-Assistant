@@ -4,6 +4,7 @@ import ErrorBoundary from "../ui/ErrorBoundary";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import VerifyEmailBanner from "./VerifyEmailBanner";
+import DemoBanner from "./DemoBanner";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,6 +17,7 @@ const DashboardLayout = () => {
       <div className="flex-1 flex flex-col min-w-0">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 p-4 sm:p-6">
+          <DemoBanner />
           <VerifyEmailBanner />
           {/* A crash inside one page keeps the sidebar and navbar alive, and clears on navigation. */}
           <ErrorBoundary resetKey={pathname}>

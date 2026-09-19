@@ -24,6 +24,10 @@ seconds to wake it back up. After that it's fast.
   bills to you instead of the deployer. The deployer's own key, if they set
   one, only acts as a capped fallback for users without a key of their own.
   See [Deployment](#deployment) below.
+- **Try it without signing up**: the login page has a demo button that opens a
+  shared, seeded, read-only account. Every write is refused for it, so it can
+  never spend on your OpenAI key. On by default outside production. Set
+  `DEMO_MODE=true` to turn it on for a deploy.
 - **Documents**: Drag and drop a PDF to upload it (10MB limit). Text gets
   extracted automatically, with OCR as a fallback for scanned or
   image-only PDFs. View the PDF right in the app.

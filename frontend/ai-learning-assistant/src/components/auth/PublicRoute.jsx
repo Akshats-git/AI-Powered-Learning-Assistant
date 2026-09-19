@@ -12,7 +12,9 @@ const PublicRoute = ({ children }) => {
     );
   }
 
-  if (user) {
+  // The read-only demo visitor is "logged in" but has no account of their own: they
+  // must be able to reach sign-in and registration (registering replaces the demo session).
+  if (user && !user.isDemo) {
     return <Navigate to="/dashboard" replace />;
   }
 

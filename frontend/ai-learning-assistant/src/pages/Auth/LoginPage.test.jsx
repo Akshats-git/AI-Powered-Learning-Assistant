@@ -63,4 +63,28 @@ describe("LoginPage", () => {
     expect(navigateMock).not.toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: /sign in/i })).not.toBeDisabled();
   });
+
+  describe("demo mode", () => {
+    it("'Try the demo' signs in as the demo account (no form input) and goes to the dashboard", async () => {
+      const loginAsDemo = vi.fn().mockResolvedValue({ isDemo: true });
+      useAuth.mockReturnValue({ login: vi.fn(), loginAsDemo });
+      render(<LoginPage />, { wrapper: MemoryRouter });
+
+      await userEvent.click(screen.getByRole("button", { name: /try the demo/i }));
+
+      expect(loginAsDemo).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/dashboard"));
+    });
+
+    it("stays on the login page if the demo is unavailable", async () => {
+      const loginAsDemo = vi.fn().mockRejectedValue(new Error("Demo mode is not enabled"));
+      useAuth.mockReturnValue({ login: vi.fn(), loginAsDemo });
+      render(<LoginPage />, { wrapper: MemoryRouter });
+
+      await userEvent.click(screen.getByRole("button", { name: /try the demo/i }));
+
+      await waitFor(() => expect(screen.getByRole("button", { name: /try the demo/i })).toBeEnabled());
+      expect(navigateMock).not.toHaveBeenCalled();
+    });
+  });
 });

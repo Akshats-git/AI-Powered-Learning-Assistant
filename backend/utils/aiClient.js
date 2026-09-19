@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { logger } from "./logger.js";
 import { modelForFeature } from "./modelRouting.js";
 import { getActiveApiKey } from "./aiContext.js";
+import { providerBreaker, isProviderFailure } from "./circuitBreaker.js";
 
 // No module-level singleton anymore: the active key can differ per request
 // (a user's own key vs. the deployer's shared fallback — see aiContext.js),
@@ -53,12 +54,18 @@ export const generate = async (prompt, { json = false, feature = "unknown", onUs
 
   let response;
   try {
-    response = await openai.chat.completions.create({
-      model,
-      messages: [{ role: "user", content: prompt }],
-      ...(json ? { response_format: { type: "json_object" } } : {}),
-    });
+    response = await providerBreaker.run(
+      () =>
+        openai.chat.completions.create({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          ...(json ? { response_format: { type: "json_object" } } : {}),
+        }),
+      { isFailure: isProviderFailure }
+    );
   } catch (err) {
+    // Fail-fast rejection: already a clear 503, not a provider error to wrap as 502.
+    if (err.code === "CIRCUIT_OPEN") throw err;
     const wrapped = new Error(`AI generation failed: ${err.message}`);
     wrapped.statusCode = 502;
     throw wrapped;

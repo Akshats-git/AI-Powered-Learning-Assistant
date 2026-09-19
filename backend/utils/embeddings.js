@@ -2,6 +2,7 @@ import crypto from "crypto";
 import OpenAI from "openai";
 import { logger } from "./logger.js";
 import { getActiveApiKey } from "./aiContext.js";
+import { providerBreaker, isProviderFailure } from "./circuitBreaker.js";
 
 // No module-level singleton — see aiClient.js's getClient() for why (the
 // active key varies per request now that users can supply their own).
@@ -76,11 +77,16 @@ export const embedTexts = async (texts, { onUsage } = {}) => {
     const startedAt = Date.now();
     let response;
     try {
-      response = await openai.embeddings.create({
-        model,
-        input: batch.map((b) => b.text),
-      });
+      response = await providerBreaker.run(
+        () =>
+          openai.embeddings.create({
+            model,
+            input: batch.map((b) => b.text),
+          }),
+        { isFailure: isProviderFailure }
+      );
     } catch (err) {
+      if (err.code === "CIRCUIT_OPEN") throw err;
       const wrapped = new Error(`Embedding generation failed: ${err.message}`);
       wrapped.statusCode = 502;
       throw wrapped;

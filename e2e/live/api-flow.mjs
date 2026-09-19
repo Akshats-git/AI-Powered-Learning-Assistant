@@ -306,6 +306,12 @@ try {
     const lst = await C.req("GET", "/api/documents");
     const d = lst.body.items.find((i) => i._id === docC._id);
     check("document list shows flashcardCount=1 and quizCount=1", d?.flashcardCount === 1 && d?.quizCount === 1, JSON.stringify({ f: d?.flashcardCount, q: d?.quizCount }));
+    r = await C.req("POST", "/api/ai/generate-flashcards", { json: { documentId: docC._id, count: 3, concept: "Krebs cycle" } });
+    check("concept-targeted flashcards: 201, titled after the concept", r.status === 201 && / — Krebs cycle$/.test(r.body.title || ""), `${r.status} ${r.body?.title}`);
+    if (r.status === 201) await C.req("DELETE", `/api/flashcards/${r.body._id}`);
+    r = await C.req("POST", "/api/ai/generate-quiz", { json: { documentId: docC._id, numQuestions: 2, concept: "Krebs cycle" } });
+    check("concept-targeted quiz: 201, every question pinned to the concept", r.status === 201 && r.body.questions?.every((q) => q.concept === "Krebs cycle"), JSON.stringify(r.body.questions?.map((q) => q.concept)));
+    if (r.status === 201) await C.req("DELETE", `/api/quizzes/${r.body._id}`);
   }
 
   // ------------------------------------------------------------ flashcards / review

@@ -18,6 +18,8 @@ import {
   retrievalSummaryPrompt,
   retrievalExplainPrompt,
   retrievalChatPrompt,
+  conceptFlashcardPrompt,
+  conceptQuizPrompt,
 } from "../utils/prompts.js";
 import { hybridSearch, DEFAULT_RESULT_LIMIT } from "../utils/hybridRetrieval.js";
 import { buildRetrievedContext, toSources, filterRelevantSources } from "../utils/citations.js";
@@ -69,18 +71,50 @@ const buildGenerationContext = async (document) => {
   return { context: buildRetrievedContext(selectChunksForBudget(chunks)), retrieved: true };
 };
 
+// How many chunks a concept-focused generation reads. Wider than chat's final
+// answer set (6): a concept is usually spread over several sections, and the
+// prompt wants enough material to write varied cards from.
+const CONCEPT_CONTEXT_CHUNKS = 8;
+
+// Context for practising ONE concept: hybrid retrieval with the concept as the
+// query (the same machinery chat uses), instead of sampling the whole document.
+const buildConceptContext = async (document, concept, { userId, requestId }) => {
+  const chunks = await Chunk.find({ document: document._id }).select("text page endPage sectionPath embedding charStart").lean();
+  if (chunks.length === 0) return { context: document.extractedText, retrieved: false };
+
+  const queryEmbedding = await embedQuery(concept, { userId, requestId, documentId: document._id });
+  const fused = hybridSearch({
+    query: concept,
+    queryEmbedding,
+    chunks: chunks.map((c) => ({ id: c._id, text: c.text, embedding: c.embedding, page: c.page, endPage: c.endPage, sectionPath: c.sectionPath })),
+    limit: CONCEPT_CONTEXT_CHUNKS,
+  });
+  if (fused.length === 0) {
+    const err = new Error(`Couldn't find anything about "${concept}" in this document`);
+    err.statusCode = 404;
+    throw err;
+  }
+  return { context: buildRetrievedContext(fused), retrieved: true };
+};
+
 export const generateFlashcards = async (req, res, next) => {
   try {
-    const { documentId, count } = req.body;
+    const { documentId, count, concept } = req.body;
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
     await assertWithinBudget(req.user._id);
 
     const cardCount = clampCount(count, 10, 30);
-    const { context, retrieved } = await buildGenerationContext(document);
-    const prompt = retrieved ? retrievalFlashcardPrompt(context, cardCount) : flashcardPrompt(context, cardCount);
+    let prompt;
+    if (concept) {
+      const { context } = await buildConceptContext(document, concept, { userId: req.user._id, requestId: req.id });
+      prompt = conceptFlashcardPrompt(context, cardCount, concept);
+    } else {
+      const { context, retrieved } = await buildGenerationContext(document);
+      prompt = retrieved ? retrievalFlashcardPrompt(context, cardCount) : flashcardPrompt(context, cardCount);
+    }
 
-    const flashcardSet = await withInFlightGuard(`${req.user._id}:${documentId}:flashcards`, async () => {
+    const flashcardSet = await withInFlightGuard(`${req.user._id}:${documentId}:flashcards${concept ? `:${concept}` : ""}`, async () => {
       let usageInfo = null;
       const result = await generate(prompt, {
         json: true,
@@ -107,7 +141,7 @@ export const generateFlashcards = async (req, res, next) => {
       return Flashcard.create({
         user: req.user._id,
         document: document._id,
-        title: `${document.title} Flashcards`,
+        title: concept ? `${document.title} — ${concept}` : `${document.title} Flashcards`,
         cards,
       });
     });
@@ -120,16 +154,22 @@ export const generateFlashcards = async (req, res, next) => {
 
 export const generateQuiz = async (req, res, next) => {
   try {
-    const { documentId, numQuestions } = req.body;
+    const { documentId, numQuestions, concept } = req.body;
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
     await assertWithinBudget(req.user._id);
 
     const questionCount = clampCount(numQuestions, 5, 20);
-    const { context, retrieved } = await buildGenerationContext(document);
-    const prompt = retrieved ? retrievalQuizPrompt(context, questionCount) : quizPrompt(context, questionCount);
+    let prompt;
+    if (concept) {
+      const { context } = await buildConceptContext(document, concept, { userId: req.user._id, requestId: req.id });
+      prompt = conceptQuizPrompt(context, questionCount, concept);
+    } else {
+      const { context, retrieved } = await buildGenerationContext(document);
+      prompt = retrieved ? retrievalQuizPrompt(context, questionCount) : quizPrompt(context, questionCount);
+    }
 
-    const quiz = await withInFlightGuard(`${req.user._id}:${documentId}:quiz`, async () => {
+    const quiz = await withInFlightGuard(`${req.user._id}:${documentId}:quiz${concept ? `:${concept}` : ""}`, async () => {
       let usageInfo = null;
       const result = await generate(prompt, {
         json: true,
@@ -152,13 +192,15 @@ export const generateQuiz = async (req, res, next) => {
         options: q.options,
         correctAnswer: q.correctAnswer,
         explanation: q.explanation || "",
-        concept: typeof q.concept === "string" && q.concept.trim() ? q.concept.trim() : null,
+        // A concept quiz is *about* one concept: don't trust the model to echo it
+        // back verbatim, or a paraphrase would fork the learner's mastery record.
+        concept: concept || (typeof q.concept === "string" && q.concept.trim() ? q.concept.trim() : null),
       }));
 
       return Quiz.create({
         user: req.user._id,
         document: document._id,
-        title: `${document.title} Quiz`,
+        title: concept ? `${document.title} — ${concept} quiz` : `${document.title} Quiz`,
         questions,
       });
     });

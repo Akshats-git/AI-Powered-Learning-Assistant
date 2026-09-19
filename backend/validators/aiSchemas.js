@@ -6,11 +6,14 @@ import { requestSchema, objectId } from "./requestSchema.js";
 // generic 500 instead of a 400. Validating the shape here catches that before
 // it ever reaches the database.
 const documentIdBody = { documentId: objectId("documentId") };
+// Optional: focus generation on one concept (a weak area) instead of the whole document.
+const conceptField = z.string().trim().min(1, "A concept cannot be empty").max(200, "Concept is too long").optional();
 
 export const generateFlashcardsSchema = requestSchema({
   body: z.object({
     ...documentIdBody,
     count: z.coerce.number().int().positive().optional(),
+    concept: conceptField,
   }),
 });
 
@@ -18,6 +21,7 @@ export const generateQuizSchema = requestSchema({
   body: z.object({
     ...documentIdBody,
     numQuestions: z.coerce.number().int().positive().optional(),
+    concept: conceptField,
   }),
 });
 

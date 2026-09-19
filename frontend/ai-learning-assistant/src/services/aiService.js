@@ -12,11 +12,12 @@ export const newIdempotencyKey = () =>
 
 const idempotent = () => ({ headers: { "Idempotency-Key": newIdempotencyKey() } });
 
-export const generateFlashcards = (documentId, count) =>
-  axiosInstance.post(API_PATHS.AI.GENERATE_FLASHCARDS, { documentId, count }, idempotent());
+// `concept` (optional) focuses generation on one weak concept instead of the whole document.
+export const generateFlashcards = (documentId, count, concept) =>
+  axiosInstance.post(API_PATHS.AI.GENERATE_FLASHCARDS, { documentId, count, ...(concept ? { concept } : {}) }, idempotent());
 
-export const generateQuiz = (documentId, numQuestions) =>
-  axiosInstance.post(API_PATHS.AI.GENERATE_QUIZ, { documentId, numQuestions }, idempotent());
+export const generateQuiz = (documentId, numQuestions, concept) =>
+  axiosInstance.post(API_PATHS.AI.GENERATE_QUIZ, { documentId, numQuestions, ...(concept ? { concept } : {}) }, idempotent());
 
 export const getSummary = (documentId) => axiosInstance.post(API_PATHS.AI.SUMMARY, { documentId });
 

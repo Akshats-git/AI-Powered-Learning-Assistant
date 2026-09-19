@@ -151,3 +151,29 @@ ${historyText || "(no prior messages)"}
 
 User question: ${question}`;
 };
+
+// Targeted practice: the learner keeps missing one concept (see Mastery / BKT),
+// so instead of sampling the whole document these prompts work from the
+// excerpts retrieved for *that concept* and drill only it.
+
+export const conceptFlashcardPrompt = (context, count, concept) => `You are an expert study assistant. The learner keeps getting the concept "${concept}" wrong. Below are the excerpts from their document most relevant to it. Generate ${count} flashcards that drill ONLY this concept: cover its definition, the distinctions people usually confuse it with, and worked or concrete examples from the excerpts. Use only what the excerpts support.
+
+Respond with ONLY valid JSON in this exact shape, no markdown fences, no extra text:
+{"flashcards": [{"question": "string", "answer": "string", "difficulty": "easy" | "medium" | "hard"}]}
+
+Document excerpts:
+"""
+${context}
+"""`;
+
+export const conceptQuizPrompt = (context, count, concept) => `You are an expert exam writer. The learner keeps getting the concept "${concept}" wrong. Below are the excerpts from their document most relevant to it. Generate ${count} multiple-choice questions that test ONLY this concept, each with exactly 4 options and one correct answer, using plausible distractors built from the common confusions. Use only what the excerpts support.
+
+Set the "concept" of every question to exactly "${concept}" so the learner's mastery of it is updated by their answers.
+
+Respond with ONLY valid JSON in this exact shape, no markdown fences, no extra text:
+{"questions": [{"question": "string", "options": ["string", "string", "string", "string"], "correctAnswer": "string", "explanation": "string", "concept": "string"}]}
+
+Document excerpts:
+"""
+${context}
+"""`;

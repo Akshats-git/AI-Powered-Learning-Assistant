@@ -245,7 +245,7 @@ Netlify for example, or with `docker-compose.yml` below, and point
   cookies, and CORS restricted to `CLIENT_URL`.
 - Set `ENCRYPTION_KEY` explicitly (see `backend/.env.example`) rather than
   relying on the `JWT_SECRET`-derived dev fallback.
-- Uploaded PDFs are still stored on local disk (`backend/uploads/`). Most
+- Uploaded PDFs are still stored on local disk (`backend/uploads/`, or wherever `UPLOAD_DIR` points, for example a mounted volume). Most
   PaaS hosts wipe that on every redeploy. The app handles this gracefully: a
   document whose file was wiped shows a clear banner instead of a broken
   viewer, and chat, flashcards and quizzes keep working since the extracted

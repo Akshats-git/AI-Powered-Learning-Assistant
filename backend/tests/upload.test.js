@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs/promises";
-import path from "path";
 import request from "supertest";
 import app from "../app.js";
+import { UPLOAD_DIR } from "../middlewares/uploadMiddleware.js";
 import Document from "../models/Document.js";
 import { createUserWithToken } from "./helpers.js";
 
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+const UPLOADS_DIR = UPLOAD_DIR;
 
 describe("POST /api/documents/upload", () => {
   it("rejects a file whose content isn't actually a PDF, even with a spoofed mimetype", async () => {

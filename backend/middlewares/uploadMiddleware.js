@@ -3,7 +3,10 @@ import path from "path";
 import crypto from "crypto";
 import multer from "multer";
 
-export const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+// UPLOAD_DIR lets a deploy point at a mounted volume, and lets the test suites
+// write somewhere disposable instead of leaving PDFs in the real uploads
+// folder. Default stays ./uploads relative to where the server was started.
+export const UPLOAD_DIR = process.env.UPLOAD_DIR ? path.resolve(process.env.UPLOAD_DIR) : path.join(process.cwd(), "uploads");
 
 // Render/Railway wipe the filesystem on every deploy, so this directory
 // won't exist on a fresh container until something creates it — without

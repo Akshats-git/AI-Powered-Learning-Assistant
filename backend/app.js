@@ -1,5 +1,3 @@
-import path from "path";
-import { fileURLToPath } from "url";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -9,6 +7,7 @@ import cookieParser from "cookie-parser";
 
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 import { requestId } from "./middlewares/requestId.js";
+import { UPLOAD_DIR } from "./middlewares/uploadMiddleware.js";
 import { httpLogger } from "./utils/logger.js";
 import authRoutes from "./routes/authRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
@@ -20,7 +19,6 @@ import adminRoutes from "./routes/adminRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import masteryRoutes from "./routes/masteryRoutes.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // Render/Railway/Fly all put a reverse proxy in front of the app. Without
@@ -52,7 +50,9 @@ app.use(
     res.removeHeader("X-Frame-Options");
     next();
   },
-  express.static(path.join(__dirname, "uploads"))
+  // Same directory multer writes to — they used to be resolved differently
+  // (cwd vs. this file's folder) and only agreed when started from backend/.
+  express.static(UPLOAD_DIR)
 );
 
 // Liveness: the process is up and serving requests. A load balancer or

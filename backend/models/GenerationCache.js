@@ -6,11 +6,11 @@ import mongoose from "mongoose";
 //
 //   feature "chat"    — fuzzy match via cosine similarity on
 //                        `questionEmbedding` (utils/semanticCache.js).
-//                        Only ever populated for a *fresh* question (no
-//                        prior conversation turns) — "what about it?" means
-//                        something different depending on history, so a
-//                        history-bearing exchange is never cached or served
-//                        from cache.
+//                        Keyed on the *standalone* question — a follow-up
+//                        is rewritten (utils/queryRewrite.js) before it's
+//                        embedded, so "what about the second one?" only
+//                        matches a cached entry once it has been resolved to
+//                        the same question that entry answered.
 //   feature "summary" — exact match via `contentHash` (a hash of the exact
 //                        text the summary was generated from) — a document's
 //                        summary is deterministic-enough on unchanged input

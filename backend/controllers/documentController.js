@@ -7,6 +7,7 @@ import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 import { buildPageMap } from "../utils/pageMap.js";
 import { ingestDocument } from "../utils/ingest.js";
+import { deleteDocumentData } from "../utils/deleteDocumentData.js";
 import { ocrPdf } from "../utils/ocr.js";
 import { logger } from "../utils/logger.js";
 
@@ -211,6 +212,10 @@ export const deleteDocument = async (req, res, next) => {
     const document = await getOwnedDocument(req.params.id, req.user._id);
 
     await fs.unlink(document.filePath).catch(() => {});
+    // Derived data first, the document row last: if this fails partway the
+    // document is still there to retry the delete against, instead of
+    // stranding rows nothing can reach any more.
+    await deleteDocumentData(document._id);
     await document.deleteOne();
 
     res.status(200).json({ message: "Document deleted" });

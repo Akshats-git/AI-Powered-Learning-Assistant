@@ -21,6 +21,7 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import masteryRoutes from "./routes/masteryRoutes.js";
+import searchRoutes from "./routes/searchRoutes.js";
 
 const app = express();
 
@@ -106,6 +107,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/review", reviewRoutes);
 app.use("/api/mastery", masteryRoutes);
+app.use("/api/search", searchRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

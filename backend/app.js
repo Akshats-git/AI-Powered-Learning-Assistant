@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 import { requestId } from "./middlewares/requestId.js";
+import { isDraining } from "./utils/gracefulShutdown.js";
 import { UPLOAD_DIR } from "./middlewares/uploadMiddleware.js";
 import { httpLogger } from "./utils/logger.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -66,9 +67,11 @@ app.get("/health", (req, res) => {
 // An orchestrator uses this to decide whether to route traffic here.
 app.get("/ready", (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;
-  res.status(dbReady ? 200 : 503).json({
-    status: dbReady ? "ready" : "not ready",
-    checks: { mongo: dbReady ? "ok" : "unavailable" },
+  // A draining instance is alive but must stop receiving new traffic.
+  const ready = dbReady && !isDraining();
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ready" : "not ready",
+    checks: { mongo: dbReady ? "ok" : "unavailable", draining: isDraining() },
   });
 });
 

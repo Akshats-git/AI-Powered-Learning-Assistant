@@ -3,7 +3,9 @@ import "dotenv/config";
 import { validateEnv } from "./utils/validateEnv.js";
 import { connectDB } from "./config/db.js";
 import app from "./app.js";
+import mongoose from "mongoose";
 import { logger } from "./utils/logger.js";
+import { installGracefulShutdown } from "./utils/gracefulShutdown.js";
 
 let missingRecommended;
 try {
@@ -23,6 +25,8 @@ await connectDB();
 
 const PORT = process.env.PORT || 8000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`Server running on ${PORT}`);
 });
+
+installGracefulShutdown({ server, onClose: () => mongoose.connection.close() });

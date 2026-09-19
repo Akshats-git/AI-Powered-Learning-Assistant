@@ -6,6 +6,7 @@ import {
   rotateRefreshToken,
   revokeFamily,
   revokeAllForUser,
+  revokeAllExcept,
   listActiveSessions,
   revokeOwnedSession,
 } from "../utils/refreshTokenStore.js";
@@ -374,6 +375,13 @@ export const updatePassword = async (req, res, next) => {
 
     user.password = newPassword;
     await user.save();
+
+    // Changing a password because the old one may be compromised should end
+    // every *other* session too — otherwise a device the attacker is already
+    // on stays logged in straight through the "fix." This browser's own
+    // session is kept, so the user isn't logged out of the page they just
+    // used to change it.
+    await revokeAllExcept(user._id, currentFamilyId(req));
 
     res.status(200).json({ message: "Password updated successfully" });
   } catch (err) {

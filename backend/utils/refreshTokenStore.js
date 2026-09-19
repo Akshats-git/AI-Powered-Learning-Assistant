@@ -67,6 +67,16 @@ export const revokeFamily = (familyId) => RefreshToken.updateMany({ familyId, re
 export const revokeAllForUser = (userId) => RefreshToken.updateMany({ user: userId, revokedAt: null }, { $set: { revokedAt: new Date() } });
 
 /**
+ * Revokes every session for a user except one family — a password *change* (as
+ * opposed to a reset) is made from a device the user is still using, so that
+ * device stays signed in while every other one (which might be whoever the
+ * old password leaked to) is ended. With no `keepFamilyId` — a caller that
+ * isn't riding on a refresh cookie — everything is revoked.
+ */
+export const revokeAllExcept = (userId, keepFamilyId) =>
+  RefreshToken.updateMany({ user: userId, revokedAt: null, familyId: { $ne: keepFamilyId ?? null } }, { $set: { revokedAt: new Date() } });
+
+/**
  * Lists a user's active sessions — one row per family that still has a
  * live (not used, not revoked, not expired) token, which is exactly the
  * token a future refresh would rotate away next.

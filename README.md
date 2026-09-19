@@ -115,12 +115,12 @@ CLIENT_URL=http://localhost:5173
 # their own key on the Profile page. With it, it's used as a fallback for
 # everyone else (see "Deployment" below for why that matters in production).
 OPENAI_API_KEY=<your OpenAI API key>
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-4o-mini   # default model; quiz generation is routed to gpt-4o regardless
 ```
 
 Check `backend/.env.example` for the optional variables and their defaults.
 That covers access and refresh token lifetimes, account lockout thresholds,
-the AI budget cap, `ENCRYPTION_KEY` for saved user API keys, and
+the AI budget cap, `OPENAI_QUIZ_MODEL` (overrides the quiz model), `ENCRYPTION_KEY` for saved user API keys, and
 `COOKIE_SAME_SITE` for cross-domain deploys.
 
 ### Frontend

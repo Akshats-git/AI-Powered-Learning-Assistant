@@ -12,11 +12,16 @@ export const FEATURE_MODELS = {
   quiz: "gpt-4o",
 };
 
+// Deliberately the *default*, not an override: OPENAI_MODEL used to force every
+// feature onto one model, but every documented deploy config (.env.example,
+// render.yaml, docker-compose.yml) sets it to gpt-4o-mini — which silently
+// switched this routing off everywhere it was meant to apply. Now
+// OPENAI_MODEL only picks the model for features with no route below, and
+// OPENAI_QUIZ_MODEL is the explicit knob for the routed one (set it to
+// gpt-4o-mini to cap cost across the board, e.g. in local dev).
 const DEFAULT_MODEL = "gpt-4o-mini";
 
-/**
- * `OPENAI_MODEL`, if set, overrides routing entirely and forces every
- * feature onto one model — useful for local cost-capping or testing a
- * single model across the board without touching this file.
- */
-export const modelForFeature = (feature) => process.env.OPENAI_MODEL || FEATURE_MODELS[feature] || DEFAULT_MODEL;
+export const modelForFeature = (feature) => {
+  const explicitOverride = feature === "quiz" ? process.env.OPENAI_QUIZ_MODEL : undefined;
+  return explicitOverride || FEATURE_MODELS[feature] || process.env.OPENAI_MODEL || DEFAULT_MODEL;
+};

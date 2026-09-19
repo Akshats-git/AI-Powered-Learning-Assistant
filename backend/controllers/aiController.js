@@ -6,7 +6,7 @@ import { getOwnedDocument } from "../utils/getOwnedDocument.js";
 import { generate } from "../utils/aiClient.js";
 import { withInFlightGuard } from "../utils/inFlightGuard.js";
 import { assertWithinBudget, recordSpend } from "../utils/aiBudget.js";
-import { recordLlmCall } from "../utils/llmLedger.js";
+import { recordLlmCall, recordCacheHit } from "../utils/llmLedger.js";
 import {
   flashcardPrompt,
   quizPrompt,
@@ -186,6 +186,7 @@ export const generateSummary = async (req, res, next) => {
     const contentHash = hashChunkText(context);
     const cachedSummary = await getCachedSummary(document._id, contentHash);
     if (cachedSummary !== null) {
+      await recordCacheHit(req.user._id, req.id, "summary");
       res.status(200).json({ summary: cachedSummary });
       return;
     }
@@ -325,6 +326,7 @@ export const chatWithDocument = async (req, res, next) => {
 
     if (cached) {
       ({ reply, sources, groundedness } = cached);
+      await recordCacheHit(req.user._id, req.id, "chat");
     } else {
       const { prompt, sources: freshSources, retrievedContext } = await buildChatPrompt({
         document,

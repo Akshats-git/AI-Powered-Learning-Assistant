@@ -68,6 +68,34 @@ describe("GET /api/admin/costs", () => {
     expect(res.body.totalCostUsd).toBeCloseTo(5, 5);
   });
 
+  it("reports the cache hit rate, and keeps cache hits out of the call and spend totals", async () => {
+    const { token } = await createUserWithToken({ email: "admin@example.com" });
+    process.env.ADMIN_EMAILS = "admin@example.com";
+    const { user } = await createUserWithToken({ email: "cacher@example.com" });
+
+    await LlmCall.create([
+      { user: user._id, feature: "chat", model: "gpt-4o-mini", costUsd: 0.01, totalTokens: 100 },
+      { user: user._id, feature: "summary", model: "gpt-4o-mini", costUsd: 0.01, totalTokens: 100 },
+      { user: user._id, feature: "chat", model: "cache", costUsd: 0, totalTokens: 0, cacheHit: true },
+      { user: user._id, feature: "chat", model: "cache", costUsd: 0, totalTokens: 0, cacheHit: true },
+      { user: user._id, feature: "embedding", model: "text-embedding-3-small", costUsd: 0.001, totalTokens: 10 },
+    ]);
+
+    const res = await request(app).get("/api/admin/costs").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.cache).toEqual({ hits: 2, lookups: 4, hitRate: 0.5 });
+    expect(res.body.totalCalls).toBe(3);
+    expect(res.body.totalCostUsd).toBeCloseTo(0.021, 5);
+  });
+
+  it("reports a 0 hit rate (not NaN) when nothing cacheable has happened yet", async () => {
+    const { token } = await createUserWithToken({ email: "admin@example.com" });
+    process.env.ADMIN_EMAILS = "admin@example.com";
+
+    const res = await request(app).get("/api/admin/costs").set("Authorization", `Bearer ${token}`);
+    expect(res.body.cache).toEqual({ hits: 0, lookups: 0, hitRate: 0 });
+  });
+
   it("clamps an out-of-range days query instead of trusting the client", async () => {
     const { token } = await createUserWithToken({ email: "admin@example.com" });
     process.env.ADMIN_EMAILS = "admin@example.com";

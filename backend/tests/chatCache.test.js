@@ -4,6 +4,7 @@ import app from "../app.js";
 import Chunk from "../models/Chunk.js";
 import Document from "../models/Document.js";
 import GenerationCache from "../models/GenerationCache.js";
+import LlmCall from "../models/LlmCall.js";
 import { createUserWithToken } from "./helpers.js";
 
 vi.mock("../utils/aiClient.js", async (importOriginal) => {
@@ -99,6 +100,12 @@ describe("chat semantic cache", () => {
     // message in the same ChatHistory, so resolving it to a standalone form
     // before checking the cache is unavoidable and correct.)
     expect(generate.callsByFeature.chat).toBe(chatCallsAfterFirst);
+
+    // The hit is recorded in the ledger (zero cost, no tokens) so a hit *rate* is queryable.
+    const hitRows = await LlmCall.find({ user: user._id, cacheHit: true, feature: "chat" }).lean();
+    expect(hitRows).toHaveLength(1);
+    expect(hitRows[0]).toMatchObject({ model: "cache", costUsd: 0, totalTokens: 0 });
+    expect(await LlmCall.countDocuments({ user: user._id, cacheHit: true })).toBe(1);
   });
 
   it("does not serve a dissimilar question from cache", async () => {
@@ -192,5 +199,6 @@ describe("summary exact-hash cache", () => {
     expect(second.status).toBe(200);
     expect(second.body.summary).toBe(first.body.summary);
     expect(generate.callCount).toBe(callsAfterFirst);
+    expect(await LlmCall.countDocuments({ user: user._id, cacheHit: true, feature: "summary" })).toBe(1);
   });
 });

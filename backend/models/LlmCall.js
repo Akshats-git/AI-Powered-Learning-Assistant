@@ -18,6 +18,11 @@ const llmCallSchema = new mongoose.Schema(
     // "shared" = billed to the deployer's OPENAI_API_KEY, "own" = the user's
     // own saved key. Lets the admin cost dashboard show only spend that's
     // actually on the deployer's bill, not every call anyone's made.
+    // True for a request served from the semantic/summary cache: no provider
+    // call happened, so cost and tokens are 0 and model is "cache". These rows
+    // are what make a cache hit *rate* queryable — hits alone tell you nothing
+    // without the misses (the ordinary "chat"/"summary" rows) beside them.
+    cacheHit: { type: Boolean, default: false },
     keySource: { type: String, enum: ["shared", "own"], default: "shared" },
   },
   { timestamps: true }

@@ -20,9 +20,13 @@ export const getCostOverview = async (req, res, next) => {
     // spending their own saved key (keySource "own") costs the deployer
     // nothing and would otherwise inflate this dashboard with spend that
     // was never actually on their bill.
-    const match = { createdAt: { $gte: since }, keySource: { $ne: "own" } };
+    const billedToDeployer = { createdAt: { $gte: since }, keySource: { $ne: "own" } };
+    // Cache hits are ledger rows too (see recordCacheHit) but aren't provider
+    // calls — keep them out of the call and spend figures, and report them
+    // separately below.
+    const match = { ...billedToDeployer, cacheHit: { $ne: true } };
 
-    const [byDay, byUser, totals] = await Promise.all([
+    const [byDay, byUser, totals, cacheRows] = await Promise.all([
       LlmCall.aggregate([
         { $match: match },
         {
@@ -78,12 +82,23 @@ export const getCostOverview = async (req, res, next) => {
           },
         },
       ]),
+      // A cacheable request is either a hit (a cacheHit row) or a miss (the
+      // ordinary chat/summary row it generated instead) — so the hit rate is
+      // hits over both.
+      LlmCall.aggregate([
+        { $match: { ...billedToDeployer, feature: { $in: ["chat", "summary"] } } },
+        { $group: { _id: { $ifNull: ["$cacheHit", false] }, n: { $sum: 1 } } },
+      ]),
     ]);
+
+    const hits = cacheRows.find((r) => r._id === true)?.n || 0;
+    const misses = cacheRows.find((r) => r._id === false)?.n || 0;
 
     res.status(200).json({
       days,
       totalCostUsd: totals[0]?.costUsd || 0,
       totalCalls: totals[0]?.calls || 0,
+      cache: { hits, lookups: hits + misses, hitRate: hits + misses > 0 ? hits / (hits + misses) : 0 },
       byDay,
       byUser,
     });

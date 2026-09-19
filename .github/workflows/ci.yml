@@ -95,12 +95,17 @@ jobs:
         working-directory: e2e
       - run: npm run test:ui
         working-directory: e2e
+      # Fails the build if retrieval/citation quality drops below evals/baseline.fake.json.
+      - run: npm run eval:check
+        working-directory: e2e
       - name: Upload journey artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-live-out
-          path: e2e/live/out
+          path: |
+            e2e/live/out
+            e2e/evals/results
 
   codeql:
     name: CodeQL

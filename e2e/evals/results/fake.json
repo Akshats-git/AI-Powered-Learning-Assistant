@@ -1,0 +1,70 @@
+{
+  "overall": {
+    "questions": 100,
+    "failedRequests": 0,
+    "hitRate": 1,
+    "exactPageRate": 1,
+    "citationPrecision": 0.8666666666666667,
+    "avgSources": 1.52,
+    "answerRate": 1,
+    "refusalRate": 0,
+    "ungroundedFlagRate": 0,
+    "latencyP50Ms": 27,
+    "latencyP95Ms": 30
+  },
+  "byCategory": {
+    "numeric": {
+      "questions": 25,
+      "failedRequests": 0,
+      "hitRate": 1,
+      "exactPageRate": 1,
+      "citationPrecision": 0.8666666666666666,
+      "avgSources": 1.4,
+      "answerRate": 1,
+      "refusalRate": null,
+      "ungroundedFlagRate": 0,
+      "latencyP50Ms": 26,
+      "latencyP95Ms": 36
+    },
+    "who": {
+      "questions": 25,
+      "failedRequests": 0,
+      "hitRate": 1,
+      "exactPageRate": 1,
+      "citationPrecision": 0.8666666666666666,
+      "avgSources": 1.4,
+      "answerRate": 1,
+      "refusalRate": null,
+      "ungroundedFlagRate": 0,
+      "latencyP50Ms": 27,
+      "latencyP95Ms": 29
+    },
+    "when": {
+      "questions": 25,
+      "failedRequests": 0,
+      "hitRate": 1,
+      "exactPageRate": 1,
+      "citationPrecision": 0.8666666666666666,
+      "avgSources": 1.4,
+      "answerRate": 1,
+      "refusalRate": null,
+      "ungroundedFlagRate": 0,
+      "latencyP50Ms": 27,
+      "latencyP95Ms": 29
+    },
+    "unanswerable": {
+      "questions": 25,
+      "failedRequests": 0,
+      "hitRate": null,
+      "exactPageRate": null,
+      "citationPrecision": null,
+      "avgSources": 1.88,
+      "answerRate": null,
+      "refusalRate": 0,
+      "ungroundedFlagRate": 0,
+      "latencyP50Ms": 28,
+      "latencyP95Ms": 30
+    }
+  },
+  "misses": []
+}

@@ -1,0 +1,16 @@
+{
+  "provider": "fake",
+  "tolerance": 0.02,
+  "gated": [
+    "hitRate",
+    "exactPageRate",
+    "citationPrecision",
+    "answerRate"
+  ],
+  "overall": {
+    "hitRate": 1,
+    "exactPageRate": 1,
+    "citationPrecision": 0.8666666666666667,
+    "answerRate": 1
+  }
+}

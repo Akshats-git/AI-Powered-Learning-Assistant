@@ -8,7 +8,10 @@
     "test:api": "node live/api-flow.mjs",
     "test:ui": "node live/ui-flow.mjs",
     "test:full": "npm test && npm run test:api && npm run test:ui && npm run test:ui:prod",
-    "test:ui:prod": "UI_PROD=1 node live/ui-flow.mjs"
+    "test:ui:prod": "UI_PROD=1 node live/ui-flow.mjs",
+    "eval": "node evals/run.mjs",
+    "eval:check": "node evals/run.mjs --check",
+    "eval:baseline": "node evals/run.mjs --update-baseline"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

@@ -35,6 +35,31 @@ describe("handleResponseError", () => {
     expect(toast.error).toHaveBeenCalledWith("Title is required");
   });
 
+  it("surfaces field-level validation messages instead of the generic 'Validation failed'", async () => {
+    const error = {
+      response: {
+        status: 400,
+        data: { error: { code: "VALIDATION_ERROR", message: "Validation failed", details: [{ path: "apiKey", message: "That doesn't look like a valid OpenAI API key" }] } },
+      },
+      config: { url: "/api/auth/api-key" },
+    };
+    await expect(handleResponseError(error)).rejects.toBe(error);
+    expect(toast.error).toHaveBeenCalledWith("That doesn't look like a valid OpenAI API key");
+  });
+
+  it("de-duplicates validation messages and shows at most two", async () => {
+    const details = [{ message: "A is required" }, { message: "A is required" }, { message: "B is too short" }, { message: "C is invalid" }];
+    const error = { response: { status: 400, data: { error: { code: "VALIDATION_ERROR", message: "Validation failed", details } } }, config: { url: "/x" } };
+    await expect(handleResponseError(error)).rejects.toBe(error);
+    expect(toast.error).toHaveBeenCalledWith("A is required. B is too short");
+  });
+
+  it("falls back to the envelope message when a validation error carries no usable details", async () => {
+    const error = { response: { status: 400, data: { error: { code: "VALIDATION_ERROR", message: "Validation failed", details: [] } } }, config: { url: "/x" } };
+    await expect(handleResponseError(error)).rejects.toBe(error);
+    expect(toast.error).toHaveBeenCalledWith("Validation failed");
+  });
+
   it("falls back to a generic message when the response has no envelope", async () => {
     const error = { message: "Network Error", config: { url: "/api/documents" } };
     await expect(handleResponseError(error)).rejects.toBe(error);

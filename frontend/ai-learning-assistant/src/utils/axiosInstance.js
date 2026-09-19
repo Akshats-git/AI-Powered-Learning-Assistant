@@ -58,10 +58,25 @@ const forceLogout = (message) => {
   }
 };
 
+// A failed Zod validation arrives as {message: "Validation failed", details:
+// [{path, message}]} — the generic top-level message tells the user nothing,
+// the per-field ones ("That doesn't look like a valid OpenAI API key") are the
+// useful part, so lead with those.
+const MAX_VALIDATION_MESSAGES_SHOWN = 2;
+
+export const errorMessageFrom = (error) => {
+  const envelope = error.response?.data?.error;
+  if (envelope?.code === "VALIDATION_ERROR" && Array.isArray(envelope.details)) {
+    const details = [...new Set(envelope.details.map((d) => d?.message).filter(Boolean))];
+    if (details.length > 0) return details.slice(0, MAX_VALIDATION_MESSAGES_SHOWN).join(". ");
+  }
+  return envelope?.message || error.message || "Something went wrong";
+};
+
 // Exported (rather than inlined in .use()) so it can be unit tested without
 // having to fake a real failing HTTP round-trip.
 export const handleResponseError = async (error) => {
-  const message = error.response?.data?.error?.message || error.message || "Something went wrong";
+  const message = errorMessageFrom(error);
   const originalRequest = error.config;
   const requestUrl = originalRequest?.url || "";
   const isAuthEndpoint = AUTH_ENDPOINTS.some((path) => requestUrl.includes(path));

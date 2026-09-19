@@ -2,6 +2,7 @@ import Flashcard from "../models/Flashcard.js";
 import ReviewLog from "../models/ReviewLog.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 import { scheduleFsrs, createInitialFsrsState } from "../utils/fsrs.js";
+import { flashcardsToCsv, flashcardsToAnki, safeFilename } from "../utils/exporters.js";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -149,6 +150,31 @@ export const deleteFlashcardSet = async (req, res, next) => {
     const set = await findOwnedSet(req.params.setId, req.user._id);
     await set.deleteOne();
     res.status(200).json({ message: "Flashcard set deleted" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const EXPORT_FORMATS = {
+  csv: { type: "text/csv; charset=utf-8", extension: "csv", build: (set) => flashcardsToCsv(set.cards) },
+  // Anki: File > Import, choose this file — fields, deck name and tags are read from its header lines.
+  anki: { type: "text/plain; charset=utf-8", extension: "txt", build: (set) => flashcardsToAnki(set.cards, set.title) },
+};
+
+export const exportFlashcardSet = async (req, res, next) => {
+  try {
+    const format = EXPORT_FORMATS[req.query.format || "csv"];
+    if (!format) {
+      res.status(400);
+      throw new Error(`Unknown format. One of: ${Object.keys(EXPORT_FORMATS).join(", ")}`);
+    }
+
+    const set = await findOwnedSet(req.params.setId, req.user._id);
+    res
+      .status(200)
+      .set("Content-Type", format.type)
+      .set("Content-Disposition", `attachment; filename="${safeFilename(set.title, format.extension)}"`)
+      .send(format.build(set));
   } catch (err) {
     next(err);
   }

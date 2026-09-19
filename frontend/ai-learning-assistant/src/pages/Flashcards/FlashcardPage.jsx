@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Download } from "lucide-react";
 
 import {
   getFlashcardSet,
@@ -9,6 +9,7 @@ import {
   reviewCard,
   toggleFavoriteCard,
   deleteFlashcardSet,
+  downloadFlashcardSet,
 } from "../../services/flashcardService";
 import FlashcardViewer from "../../components/flashcards/FlashcardViewer";
 import RetentionForecastChart from "../../components/flashcards/RetentionForecastChart";
@@ -112,6 +113,17 @@ const FlashcardPage = () => {
         <>
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold text-gray-900 truncate">{set.title}</h1>
+            <div className="flex items-center gap-4 shrink-0">
+              {[["csv", "Export CSV"], ["anki", "Export for Anki"]].map(([format, label]) => (
+                <button
+                  key={format}
+                  onClick={() => downloadFlashcardSet(set._id, format, set.title).catch(() => {})}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+                >
+                  <Download className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
             <button
               onClick={() => setShowDelete(true)}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-600"
@@ -119,6 +131,7 @@ const FlashcardPage = () => {
               <Trash2 className="w-4 h-4" />
               Delete Set
             </button>
+            </div>
           </div>
 
           <FlashcardViewer cards={set.cards} onReview={handleReview} onToggleFavorite={handleToggleFavorite} />

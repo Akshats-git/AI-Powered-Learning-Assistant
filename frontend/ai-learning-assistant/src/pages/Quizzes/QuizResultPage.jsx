@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Trophy, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
+import { Trophy, CheckCircle2, XCircle, ArrowLeft, Download } from "lucide-react";
 
-import { getQuizResults } from "../../services/quizService";
+import { getQuizResults, downloadQuiz } from "../../services/quizService";
 
 const ENCOURAGEMENT = (pct) => {
   if (pct >= 90) return "Outstanding work!";
@@ -101,6 +101,7 @@ const QuizResultPage = () => {
         ))}
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
       {results.document && (
         <Link
           to={`/documents/${results.document}`}
@@ -110,6 +111,14 @@ const QuizResultPage = () => {
           Return to Document
         </Link>
       )}
+        <button
+          onClick={() => downloadQuiz(id, results.title).catch(() => {})}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+        >
+          <Download className="w-4 h-4" />
+          Export as Markdown
+        </button>
+      </div>
     </div>
   );
 };

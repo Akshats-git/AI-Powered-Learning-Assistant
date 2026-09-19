@@ -359,6 +359,10 @@ try {
     check("toggle favorite on", r.status === 200 && r.body.cards.find((c) => c._id === cards[0]._id).isFavorite === true);
     r = await C.req("PUT", `/api/flashcards/${setC._id}/cards/${cards[0]._id}/favorite`);
     check("toggle favorite off", r.body.cards.find((c) => c._id === cards[0]._id).isFavorite === false);
+    r = await C.req("GET", `/api/flashcards/${setC._id}/export`);
+    check("export CSV: attachment, header row, one row per card", r.status === 200 && /attachment; filename=".*\.csv"/.test(r.headers.get("content-disposition") || "") && r.text.includes("question,answer,difficulty,favorite") && r.text.trim().split("\r\n").length === 5, `${r.status} ${r.headers.get("content-disposition")}`);
+    r = await C.req("GET", `/api/flashcards/${setC._id}/export?format=anki`);
+    check("export Anki: import header + tab-separated notes", r.status === 200 && r.text.startsWith("#separator:tab") && r.text.includes("\tdifficulty::"), r.text.slice(0, 80));
     check("review of unknown cardId -> 404", (await C.req("PUT", `/api/flashcards/${setC._id}/cards/${"a".repeat(24)}/review`, { json: { grade: "good" } })).status === 404);
   }
 
@@ -382,6 +386,8 @@ try {
     check("resubmit a completed quiz -> 409 (score can't be overwritten)", (await C.req("POST", `/api/quizzes/${quizC._id}/submit`, { json: { answers } })).status === 409);
     r = await C.req("GET", `/api/quizzes/${quizC._id}/results`);
     check("results: per-question userAnswer/correctAnswer/explanation/isCorrect, totals match submit", r.status === 200 && r.body.percentage === 50 && r.body.questions.filter((q) => q.isCorrect).length === 2 && r.body.questions.every((q) => q.explanation && q.correctAnswer), r.text.slice(0, 200));
+    r = await C.req("GET", `/api/quizzes/${quizC._id}/export`);
+    check("quiz export (finished): Markdown with score and the answer key", r.status === 200 && /markdown/.test(r.headers.get("content-type") || "") && r.text.includes("**Score:** 50%") && r.text.includes("✅ correct"), r.text.slice(0, 80));
     check("QuizAttempt history row written", (await db.collection("quizattempts").countDocuments({ quiz: new mongoose.Types.ObjectId(quizC._id) })) === 1);
 
     r = await C.req("GET", "/api/mastery");

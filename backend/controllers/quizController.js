@@ -2,6 +2,7 @@ import Quiz from "../models/Quiz.js";
 import QuizAttempt from "../models/QuizAttempt.js";
 import { parsePagination, buildPageMeta } from "../utils/pagination.js";
 import { recordQuizMastery } from "../utils/masteryTracking.js";
+import { quizResultsToMarkdown, safeFilename } from "../utils/exporters.js";
 
 const findOwnedQuiz = async (quizId, userId) => {
   const quiz = await Quiz.findOne({ _id: quizId, user: userId });
@@ -182,6 +183,30 @@ export const getQuizResults = async (req, res, next) => {
       percentage: quiz.score,
       questions,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Markdown of a *finished* quiz with the answer key — an unfinished quiz's key
+// must never leave the server (see stripAnswers), so it can't be exported.
+export const exportQuiz = async (req, res, next) => {
+  try {
+    const quiz = await findOwnedQuiz(req.params.id, req.user._id);
+    if (!quiz.isCompleted) {
+      res.status(400);
+      throw new Error("Finish the quiz before exporting it");
+    }
+
+    const answerByQuestionId = new Map(quiz.userAnswers.map((a) => [a.questionId.toString(), a.answer]));
+    const questions = quiz.questions.map((q) => ({ question: q.question, options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation, userAnswer: answerByQuestionId.get(q._id.toString()) ?? null }));
+    const correct = questions.filter((q) => q.userAnswer === q.correctAnswer).length;
+
+    res
+      .status(200)
+      .set("Content-Type", "text/markdown; charset=utf-8")
+      .set("Content-Disposition", `attachment; filename="${safeFilename(quiz.title, "md")}"`)
+      .send(quizResultsToMarkdown({ title: quiz.title, percentage: quiz.score, correct, total: questions.length, questions }));
   } catch (err) {
     next(err);
   }

@@ -37,6 +37,7 @@ export const API_PATHS = {
     REVIEW_CARD: (setId, cardId) => `/api/flashcards/${setId}/cards/${cardId}/review`,
     FAVORITE_CARD: (setId, cardId) => `/api/flashcards/${setId}/cards/${cardId}/favorite`,
     DELETE_SET: (setId) => `/api/flashcards/${setId}`,
+    EXPORT_SET: (setId) => `/api/flashcards/${setId}/export`,
   },
   QUIZZES: {
     LIST: "/api/quizzes",
@@ -44,6 +45,7 @@ export const API_PATHS = {
     GET: (id) => `/api/quizzes/${id}`,
     SUBMIT: (id) => `/api/quizzes/${id}/submit`,
     RESULTS: (id) => `/api/quizzes/${id}/results`,
+    EXPORT: (id) => `/api/quizzes/${id}/export`,
     DELETE: (id) => `/api/quizzes/${id}`,
   },
   DASHBOARD: {

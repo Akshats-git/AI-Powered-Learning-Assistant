@@ -6,6 +6,7 @@ import {
   submitQuiz,
   getQuizResults,
   deleteQuiz,
+  exportQuiz,
 } from "../controllers/quizController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { validate } from "../middlewares/validate.js";
@@ -21,6 +22,7 @@ router.get("/document/:documentId", validate(idParamsSchema("documentId")), list
 router.get("/:id", validate(idParamsSchema("id")), getQuiz);
 router.post("/:id/submit", validate(submitQuizSchema), submitQuiz);
 router.get("/:id/results", validate(idParamsSchema("id")), getQuizResults);
+router.get("/:id/export", validate(idParamsSchema("id")), exportQuiz);
 router.delete("/:id", validate(idParamsSchema("id")), deleteQuiz);
 
 export default router;

@@ -6,6 +6,7 @@ import {
   reviewCard,
   toggleFavoriteCard,
   deleteFlashcardSet,
+  exportFlashcardSet,
 } from "../controllers/flashcardController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { validate } from "../middlewares/validate.js";
@@ -19,6 +20,7 @@ router.use(protect);
 router.get("/", listFlashcardSets);
 router.get("/document/:documentId", validate(idParamsSchema("documentId")), listFlashcardSetsForDocument);
 router.get("/:setId", validate(idParamsSchema("setId")), getFlashcardSet);
+router.get("/:setId/export", validate(idParamsSchema("setId")), exportFlashcardSet);
 router.put("/:setId/cards/:cardId/review", validate(reviewCardSchema), reviewCard);
 router.put("/:setId/cards/:cardId/favorite", validate(idParamsSchema("setId", "cardId")), toggleFavoriteCard);
 router.delete("/:setId", validate(idParamsSchema("setId")), deleteFlashcardSet);

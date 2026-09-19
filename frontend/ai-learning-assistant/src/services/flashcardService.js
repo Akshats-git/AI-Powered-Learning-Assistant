@@ -1,5 +1,6 @@
 import axiosInstance from "../utils/axiosInstance";
 import { API_PATHS } from "../utils/apiPaths";
+import { saveBlob, filenameFromDisposition } from "../utils/download";
 
 export const listFlashcardSets = (params) => axiosInstance.get(API_PATHS.FLASHCARDS.LIST, { params });
 
@@ -17,3 +18,9 @@ export const toggleFavoriteCard = (setId, cardId) =>
   axiosInstance.put(API_PATHS.FLASHCARDS.FAVORITE_CARD(setId, cardId));
 
 export const deleteFlashcardSet = (setId) => axiosInstance.delete(API_PATHS.FLASHCARDS.DELETE_SET(setId));
+
+// format: "csv" (spreadsheets) or "anki" (Anki's File > Import text format).
+export const downloadFlashcardSet = async (setId, format, fallbackName = "flashcards") => {
+  const res = await axiosInstance.get(API_PATHS.FLASHCARDS.EXPORT_SET(setId), { params: { format }, responseType: "blob" });
+  saveBlob(res.data, filenameFromDisposition(res.headers["content-disposition"], `${fallbackName}.${format === "anki" ? "txt" : "csv"}`));
+};

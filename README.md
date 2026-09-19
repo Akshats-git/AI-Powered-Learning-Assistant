@@ -31,14 +31,25 @@ seconds to wake it back up. After that it's fast.
 - **Documents**: Drag and drop a PDF to upload it (10MB limit). Text gets
   extracted automatically, with OCR as a fallback for scanned or
   image-only PDFs. View the PDF right in the app.
-- **AI Chat**: Ask questions about a document and get markdown replies with
-  code highlighting.
+- **AI Chat**: Ask questions about a document. Answers stream in word by word
+  (with a Stop button), come back as markdown with code highlighting, and cite
+  the exact page they came from. Click a citation to open the PDF at that page.
+  Retrieval is hybrid (BM25 + vector + rank fusion + rerank) over the whole
+  document, and a second pass flags claims the excerpts don't support.
 - **AI Actions**: Generate a summary in one click, or ask for a concept
   explanation on demand.
 - **Flashcards**: AI generates flashcard sets. Flip through them with a card
   viewer and the keyboard. Each card tracks its own review progress.
 - **Quizzes**: AI generates multiple-choice quizzes. Grading happens on the
   server, and you get a detailed results page.
+- **Practice what you miss**: The dashboard ranks your weak concepts (Bayesian
+  knowledge tracing over your quiz answers). One click generates flashcards or a
+  quiz on just that concept, from the passages that cover it.
+- **Search and shortcuts**: Ctrl/⌘+K opens a command palette that jumps to any
+  page or searches your documents, decks, quizzes and chats. `?` lists every
+  shortcut.
+- **Export**: Download a deck as CSV or as Anki's text-import format, and a
+  finished quiz as Markdown.
 - **Dashboard**: See your document, flashcard and quiz counts, plus recent
   activity.
 
@@ -259,6 +270,43 @@ Netlify for example, or with `docker-compose.yml` below, and point
 - `docker-compose.yml` runs the whole stack (Mongo, the API, and the built
   frontend behind nginx) in one command for a self-hosted deploy. See the
   file for which env vars it forwards.
+
+## Operating it
+
+- **Metrics**: `GET /metrics` (Prometheus text). Per-route latency, LLM calls,
+  tokens and estimated dollars by feature, cache hits, and whether the circuit
+  breaker is open. Set `METRICS_TOKEN` and scrape with a bearer token. Without
+  it, `/metrics` is open in dev and returns 404 in production.
+- **Health**: `GET /health` is liveness. `GET /ready` checks MongoDB, reports the
+  LLM breaker as `ok` or `degraded` (informational: AI is down, the rest works),
+  and returns 503 while the server is draining for shutdown.
+- **Graceful shutdown**: on SIGTERM the server stops accepting connections,
+  lets in-flight requests (including a half-finished AI generation) complete,
+  closes MongoDB, then exits, with a 15 second cap.
+- **Circuit breaker**: after repeated provider failures, AI calls fail fast with
+  a 503 and a retry hint instead of piling up behind an outage. A user's own bad
+  key never trips it. See `CIRCUIT_*` in `backend/.env.example`.
+- **Idempotency**: send an `Idempotency-Key` header on `POST /api/ai/chat`,
+  `/generate-flashcards` and `/generate-quiz`. A retry with the same key replays
+  the first response instead of paying for and saving a second generation. The
+  frontend does this for you.
+- **Audit log**: logins, failed logins, lockouts, refresh-token reuse, password
+  changes and resets, session revocations and API-key changes are recorded
+  (never with secrets). Admins read them at `GET /api/admin/audit`.
+- **Content Security Policy**: the API sends a deny-all policy (it only returns
+  JSON and PDFs), with framing of `/uploads/*` allowed for the frontend origin
+  only. The production frontend bundle ships a strict CSP `<meta>` with no
+  inline scripts, built from `VITE_API_BASE_URL`.
+
+## Testing
+
+| Command | What it covers |
+|---|---|
+| `cd backend && npm test` | ~450 unit and integration tests against an in-memory MongoDB |
+| `cd frontend/ai-learning-assistant && npm test` | ~160 component and unit tests |
+| `cd e2e && npm test` | Playwright smoke tests (register, upload) |
+| `cd e2e && npm run test:full` | The whole product: an API journey and two real-browser journeys (dev server and the production build under its CSP), against a fake OpenAI server |
+| `cd e2e && npm run eval:check` | RAG evals: retrieval, citation and answer scores over a 100-question gold set, failing on a regression. See [e2e/evals/README.md](e2e/evals/README.md) for what it does and doesn't show |
 
 ## Notes
 

@@ -117,6 +117,14 @@ const run = () => {
     );
   }
 
+  log("");
+  log(`## How to read this\n`);
+  log(`**This is not evidence that FSRS is better *or* worse than SM-2 — it shows the two algorithms run and that the comparison is reproducible.** Three reasons it can't be read as a benchmark:\n`);
+  log(`1. **The learner is invented.** In \`utils/reviewSimulation.js\` a card's true stability grows by at most ~1.85x per successful review and a lapse cuts it to 30–45%. FSRS's update equations assume a memory model that grows faster (its defaults were fit to large real review datasets), so here it schedules intervals that are too long and lands below its own retention target at every setting (see the 80% row). The iso-retention figure corrects for the retention gap, not for the mismatch in dynamics.`);
+  log(`2. **The FSRS weights are unverified.** The 17 defaults in \`utils/fsrs.js\` were reconstructed from documentation, with no reference implementation to check them against, and may mix weights from one FSRS version with the forgetting curve of another. They should be checked against the canonical implementation, or refit on real data, before anything is concluded from them.`);
+  log(`3. **The ground-truth forgetting curve is FSRS's own power law** (disclosed in \`utils/reviewSimulation.js\`), which favours FSRS in a way real users would not.\n`);
+  log(`Net: no "FSRS needs N% fewer reviews" claim (or its opposite) is supported by this file. Settling it needs real \`ReviewLog\` history replayed through both schedulers, with FSRS's parameters refit on that data.`);
+
   const outPath = path.join(__dirname, "../../docs/scheduler-comparison.md");
   fs.writeFileSync(outPath, lines.join("\n") + "\n");
   console.log(`\nWritten to ${path.relative(process.cwd(), outPath)}`);

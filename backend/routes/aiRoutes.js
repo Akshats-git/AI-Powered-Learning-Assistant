@@ -11,6 +11,7 @@ import { protect } from "../middlewares/authMiddleware.js";
 import { attachAiKeyContext } from "../middlewares/aiKeyContext.js";
 import { aiRateLimiter } from "../middlewares/rateLimiter.js";
 import { validate } from "../middlewares/validate.js";
+import { idempotent } from "../middlewares/idempotency.js";
 import {
   generateFlashcardsSchema,
   generateQuizSchema,
@@ -26,11 +27,11 @@ router.use(protect);
 router.use(aiRateLimiter);
 router.use(attachAiKeyContext);
 
-router.post("/generate-flashcards", validate(generateFlashcardsSchema), generateFlashcards);
-router.post("/generate-quiz", validate(generateQuizSchema), generateQuiz);
+router.post("/generate-flashcards", validate(generateFlashcardsSchema), idempotent, generateFlashcards);
+router.post("/generate-quiz", validate(generateQuizSchema), idempotent, generateQuiz);
 router.post("/summary", validate(summarySchema), generateSummary);
 router.post("/explain", validate(explainSchema), explainConcept);
-router.post("/chat", validate(chatSchema), chatWithDocument);
+router.post("/chat", validate(chatSchema), idempotent, chatWithDocument);
 router.get("/chat-history/:documentId", validate(chatHistoryParamsSchema), getChatHistory);
 
 export default router;

@@ -18,6 +18,13 @@ describe("applyRerankScores", () => {
     expect(reordered.map((c) => c.id)).toEqual(["c", "a", "b"]);
   });
 
+  it("attaches each scored candidate's relevance so citations can filter on it", () => {
+    const reordered = applyRerankScores(candidates, { scores: [{ index: 0, score: 6 }, { index: 2, score: 9 }] }, 3);
+    expect(reordered.find((c) => c.id === "c").relevance).toBe(9);
+    expect(reordered.find((c) => c.id === "a").relevance).toBe(6);
+    expect(reordered.find((c) => c.id === "b")).not.toHaveProperty("relevance");
+  });
+
   it("truncates to the requested limit", () => {
     const reordered = applyRerankScores(
       candidates,

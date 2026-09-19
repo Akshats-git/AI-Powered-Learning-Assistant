@@ -54,11 +54,14 @@ export const applyRerankScores = (candidates, scoresResponse, limit) => {
       // Ties (including "no score returned") fall back to the fused order —
       // stable-sorted below, so a completely un-scored response is a no-op.
       score: scoreByIndex.has(index) ? scoreByIndex.get(index) : -index,
+      scored: scoreByIndex.has(index),
       originalIndex: index,
     }))
     .sort((a, b) => b.score - a.score || a.originalIndex - b.originalIndex)
     .slice(0, limit)
-    .map((entry) => entry.candidate);
+    // The score rides along so citations can drop chunks the reranker itself
+    // judged irrelevant (utils/citations.js's filterRelevantSources).
+    .map((entry) => (entry.scored ? { ...entry.candidate, relevance: entry.score } : entry.candidate));
 };
 
 /**

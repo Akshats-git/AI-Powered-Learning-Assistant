@@ -206,8 +206,30 @@ describe("POST /api/ai/chat — retrieval wiring", () => {
       .send({ documentId: document._id.toString(), message: "How does mitochondria produce ATP?" });
 
     expect(res.status).toBe(200);
-    expect(res.body.sources).toHaveLength(6);
+    // Six chunks were shown to the model, but the reranker scored five of them
+    // 1/10 — only the one it judged relevant is worth citing.
+    expect(res.body.sources).toHaveLength(1);
     expect(res.body.sources[0].snippet).toContain("UNIQUE_RERANK_WINNER");
+    expect(res.body.sources[0].relevance).toBe(10);
+  });
+
+  it("keeps every retrieved chunk as a source when reranking never ran (nothing to filter on)", async () => {
+    process.env.OPENAI_API_KEY = "sk-test";
+    embedTexts.mockResolvedValue([[1, 0, 0]]);
+
+    const { user, token } = await createUserWithToken();
+    const document = await makeDocument(user._id);
+    for (let i = 0; i < 3; i += 1) {
+      await makeChunk(document._id, user._id, { index: i, contentHash: `few-${i}`, text: "mitochondria produces ATP for the cell", page: i + 1, endPage: i + 1 });
+    }
+    const res = await request(app)
+      .post("/api/ai/chat")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ documentId: document._id.toString(), message: "How does mitochondria produce ATP?" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sources).toHaveLength(3);
+    expect(res.body.sources.every((s) => !("relevance" in s))).toBe(true);
   });
 
   it("rewrites an ambiguous follow-up before retrieval, so it can find a chunk the raw question shares no words with", async () => {

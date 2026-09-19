@@ -59,10 +59,16 @@ const ChatSources = ({ sources, groundedness }) => {
             <ul className="mt-1.5 space-y-1.5">
               {sources.map((source, i) => {
                 const pageRange = formatPageRange(source.page, source.endPage);
+                // The exact page of the matching passage, when the server could
+                // work it out — the chunk's own range can span several pages.
+                const exactPage = source.snippetPage != null ? `p. ${source.snippetPage}` : null;
                 return (
                   <li key={source.chunkId ?? i} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                     <div className="flex flex-wrap items-center gap-1.5 font-medium text-gray-500">
-                      {pageRange && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">{pageRange}</span>}
+                      {(exactPage || pageRange) && (
+                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">{exactPage || pageRange}</span>
+                      )}
+                      {exactPage && pageRange && pageRange !== exactPage && <span className="text-gray-400">in {pageRange}</span>}
                       {source.sectionPath?.length > 0 && <span>{source.sectionPath.join(" > ")}</span>}
                     </div>
                     <p className="mt-1 text-gray-500">{source.snippet}</p>

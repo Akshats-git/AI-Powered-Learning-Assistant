@@ -42,6 +42,22 @@ describe("ChatSources", () => {
     expect(screen.getByText("p. 9–10")).toBeInTheDocument();
   });
 
+  it("prefers the exact snippet page over the chunk's page range, keeping the range as context", async () => {
+    render(<ChatSources sources={[{ chunkId: "c4", page: 21, endPage: 23, snippetPage: 22, sectionPath: [], snippet: "Theorem 4.2 states." }]} />);
+    await userEvent.click(screen.getByRole("button", { name: /1 source/i }));
+
+    expect(screen.getByText("p. 22")).toBeInTheDocument();
+    expect(screen.getByText("in p. 21–23")).toBeInTheDocument();
+  });
+
+  it("shows no 'in …' hint when the exact page equals the whole range", async () => {
+    render(<ChatSources sources={[{ chunkId: "c5", page: 7, endPage: 7, snippetPage: 7, sectionPath: [], snippet: "One page." }]} />);
+    await userEvent.click(screen.getByRole("button", { name: /1 source/i }));
+
+    expect(screen.getByText("p. 7")).toBeInTheDocument();
+    expect(screen.queryByText(/^in p\./)).not.toBeInTheDocument();
+  });
+
   it("collapses again on a second click", async () => {
     render(<ChatSources sources={SOURCES} />);
     const toggle = screen.getByRole("button", { name: /2 sources/i });

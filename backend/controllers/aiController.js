@@ -20,7 +20,7 @@ import {
   retrievalChatPrompt,
 } from "../utils/prompts.js";
 import { hybridSearch, DEFAULT_RESULT_LIMIT } from "../utils/hybridRetrieval.js";
-import { buildRetrievedContext, toSources } from "../utils/citations.js";
+import { buildRetrievedContext, toSources, filterRelevantSources } from "../utils/citations.js";
 import { selectChunksForBudget } from "../utils/contextSelection.js";
 import { embedTexts } from "../utils/embeddings.js";
 import { rerankChunks } from "../utils/rerank.js";
@@ -276,14 +276,14 @@ const buildChatPrompt = async ({ document, message, recentHistory, searchQuery, 
   const wholeDocumentFallback = () => ({ prompt: chatPrompt(document.extractedText, recentHistory, message), sources: [], retrievedContext: null });
 
   const chunks = await Chunk.find({ document: document._id })
-    .select("text page endPage sectionPath embedding")
+    .select("text page endPage sectionPath embedding charStart")
     .lean();
   if (chunks.length === 0) return wholeDocumentFallback();
 
   const fused = hybridSearch({
     query: searchQuery,
     queryEmbedding,
-    chunks: chunks.map((c) => ({ id: c._id, text: c.text, embedding: c.embedding, page: c.page, endPage: c.endPage, sectionPath: c.sectionPath })),
+    chunks: chunks.map((c) => ({ id: c._id, text: c.text, embedding: c.embedding, page: c.page, endPage: c.endPage, sectionPath: c.sectionPath, charStart: c.charStart })),
     limit: RERANK_CANDIDATE_POOL,
   });
   if (fused.length === 0) return wholeDocumentFallback();
@@ -291,7 +291,7 @@ const buildChatPrompt = async ({ document, message, recentHistory, searchQuery, 
   const results = await rerankChunks({ query: searchQuery, candidates: fused, limit: DEFAULT_RESULT_LIMIT, userId, requestId });
   const retrievedContext = buildRetrievedContext(results);
 
-  return { prompt: retrievalChatPrompt(retrievedContext, recentHistory, message), sources: toSources(results), retrievedContext };
+  return { prompt: retrievalChatPrompt(retrievedContext, recentHistory, message), sources: filterRelevantSources(toSources(results, { query: searchQuery, pageMap: document.pageMap })), retrievedContext };
 };
 
 export const chatWithDocument = async (req, res, next) => {

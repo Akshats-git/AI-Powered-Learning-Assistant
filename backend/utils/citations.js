@@ -54,6 +54,7 @@ export const findBestSnippet = (text, query, length = SNIPPET_LENGTH) => {
   const head = () => ({
     snippet: text.length > length ? `${text.slice(0, length).trimEnd()}…` : text,
     matchOffset: null,
+    distinct: 0,
   });
 
   const terms = queryTerms(query);
@@ -91,6 +92,7 @@ export const findBestSnippet = (text, query, length = SNIPPET_LENGTH) => {
   return {
     snippet: `${start > 0 ? "…" : ""}${body}${end < text.length ? "…" : ""}`,
     matchOffset: best.pos,
+    distinct: best.distinct,
   };
 };
 
@@ -105,24 +107,41 @@ export const findBestSnippet = (text, query, length = SNIPPET_LENGTH) => {
  * exact `snippetPage` — a chunk's own `page`–`endPage` range can span several
  * pages. A `relevance` score from reranking, if the chunk has one, passes through.
  */
-export const toSources = (chunks, { query = null, pageMap = null } = {}) =>
-  (chunks || []).map((chunk) => {
-    const { snippet, matchOffset } = query
+export const toSources = (chunks, { query = null, pageMap = null } = {}) => {
+  const entries = (chunks || []).map((chunk) => {
+    const { snippet, matchOffset, distinct } = query
       ? findBestSnippet(chunk.text, query)
-      : { snippet: chunk.text.length > SNIPPET_LENGTH ? `${chunk.text.slice(0, SNIPPET_LENGTH).trimEnd()}…` : chunk.text, matchOffset: null };
+      : { snippet: chunk.text.length > SNIPPET_LENGTH ? `${chunk.text.slice(0, SNIPPET_LENGTH).trimEnd()}…` : chunk.text, matchOffset: null, distinct: 0 };
 
     return {
-      chunkId: chunk.id ?? null,
-      page: chunk.page ?? null,
-      endPage: chunk.endPage ?? null,
-      sectionPath: chunk.sectionPath || [],
-      snippet,
-      ...(matchOffset !== null && pageMap?.length && Number.isFinite(chunk.charStart)
-        ? { snippetPage: pageForOffset(pageMap, chunk.charStart + matchOffset) }
-        : {}),
-      ...(chunk.relevance != null ? { relevance: chunk.relevance } : {}),
+      distinct,
+      hasRelevance: chunk.relevance != null,
+      source: {
+        chunkId: chunk.id ?? null,
+        page: chunk.page ?? null,
+        endPage: chunk.endPage ?? null,
+        sectionPath: chunk.sectionPath || [],
+        snippet,
+        ...(matchOffset !== null && pageMap?.length && Number.isFinite(chunk.charStart)
+          ? { snippetPage: pageForOffset(pageMap, chunk.charStart + matchOffset) }
+          : {}),
+        ...(chunk.relevance != null ? { relevance: chunk.relevance } : {}),
+      },
     };
   });
+
+  // Without rerank scores (a small document skips reranking) the order is raw
+  // fusion order, which puts the chunk that actually answers anywhere among up
+  // to six. Order by how many of the question's terms each chunk's best passage
+  // covers, and when at least two chunks match the question lexically, stop
+  // citing the ones sharing no term with it at all. (One lexical match isn't
+  // enough evidence to discard the rest — a paraphrased answer has no overlap.)
+  if (query && entries.length > 1 && entries.every((e) => !e.hasRelevance)) {
+    entries.sort((a, b) => b.distinct - a.distinct); // stable: ties keep fusion order
+    if (entries.filter((e) => e.distinct > 0).length >= 2) return entries.filter((e) => e.distinct > 0).map((e) => e.source);
+  }
+  return entries.map((e) => e.source);
+};
 
 // Reranking scores relevance 0–10. Retrieval hands the model up to six chunks,
 // but the UI used to list all six as "sources" for an answer that only used

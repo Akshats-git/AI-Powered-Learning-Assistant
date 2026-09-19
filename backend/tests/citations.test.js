@@ -118,6 +118,36 @@ describe("toSources with a query and page map", () => {
   });
 });
 
+describe("toSources ordering without rerank scores", () => {
+  const mk = (id, text) => ({ id, text, page: 1, endPage: 1, sectionPath: [] });
+  const query = "alpha beta gamma";
+
+  it("puts the chunk covering the most query terms first, ahead of fusion order", () => {
+    const sources = toSources([mk("weak", "only alpha here"), mk("strong", "alpha beta gamma all present"), mk("mid", "alpha and beta")], { query });
+    expect(sources.map((s) => s.chunkId)).toEqual(["strong", "mid", "weak"]);
+  });
+
+  it("keeps fusion order among chunks that tie", () => {
+    const sources = toSources([mk("first", "alpha beta"), mk("second", "beta alpha")], { query });
+    expect(sources.map((s) => s.chunkId)).toEqual(["first", "second"]);
+  });
+
+  it("drops chunks sharing no term with the question once two others match", () => {
+    const sources = toSources([mk("noise", "completely unrelated words"), mk("a", "alpha beta"), mk("b", "gamma alpha")], { query });
+    expect(sources.map((s) => s.chunkId).sort()).toEqual(["a", "b"]);
+  });
+
+  it("keeps a non-matching chunk when only one chunk matches (a paraphrased answer has no overlap)", () => {
+    const sources = toSources([mk("paraphrase", "unrelated wording of the answer"), mk("a", "alpha beta")], { query });
+    expect(sources).toHaveLength(2);
+  });
+
+  it("leaves reranked sources in the reranker's order", () => {
+    const sources = toSources([{ ...mk("top", "nothing matches"), relevance: 9 }, { ...mk("low", "alpha beta gamma"), relevance: 5 }], { query });
+    expect(sources.map((s) => s.chunkId)).toEqual(["top", "low"]);
+  });
+});
+
 describe("filterRelevantSources", () => {
   it("drops sources the reranker scored below the threshold, keeping order", () => {
     const kept = filterRelevantSources([{ chunkId: "a", relevance: 9 }, { chunkId: "b", relevance: 1 }, { chunkId: "c", relevance: 4 }]);

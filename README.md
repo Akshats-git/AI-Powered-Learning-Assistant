@@ -302,8 +302,8 @@ Netlify for example, or with `docker-compose.yml` below, and point
 
 | Command | What it covers |
 |---|---|
-| `cd backend && npm test` | ~450 unit and integration tests against an in-memory MongoDB |
-| `cd frontend/ai-learning-assistant && npm test` | ~160 component and unit tests |
+| `cd backend && npm test` | 500+ unit and integration tests against an in-memory MongoDB |
+| `cd frontend/ai-learning-assistant && npm test` | 160+ component and unit tests |
 | `cd e2e && npm test` | Playwright smoke tests (register, upload) |
 | `cd e2e && npm run test:full` | The whole product: an API journey and two real-browser journeys (dev server and the production build under its CSP), against a fake OpenAI server |
 | `cd e2e && npm run eval:check` | RAG evals: retrieval, citation and answer scores over a 100-question gold set, failing on a regression. See [e2e/evals/README.md](e2e/evals/README.md) for what it does and doesn't show |

@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import VerifyEmailBanner from "./VerifyEmailBanner";
 import DemoBanner from "./DemoBanner";
+import OfflineBanner from "./OfflineBanner";
 import CommandPalette from "../ui/CommandPalette";
 import ShortcutsSheet from "../ui/ShortcutsSheet";
 import { useGlobalHotkeys } from "../../hooks/useGlobalHotkeys";
@@ -32,6 +33,7 @@ const DashboardLayout = () => {
       <div className="flex-1 flex flex-col min-w-0">
         <Navbar onMenuClick={() => setSidebarOpen(true)} onSearchClick={openPalette} />
         <main className="flex-1 p-4 sm:p-6">
+          <OfflineBanner />
           <DemoBanner />
           <VerifyEmailBanner />
           {/* A crash inside one page keeps the sidebar and navbar alive, and clears on navigation. */}

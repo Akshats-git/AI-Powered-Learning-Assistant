@@ -104,3 +104,59 @@ export const generate = async (prompt, { json = false, feature = "unknown", onUs
     throw err;
   }
 };
+
+/**
+ * Streaming counterpart of generate() for free-text answers. Calls `onToken`
+ * with each text delta as it arrives and resolves to the full text. Same
+ * breaker, cost logging and `onUsage` contract as generate().
+ *
+ * `signal` aborts the upstream request (a client that disconnected), which
+ * rejects with an AbortError — callers should treat that as "stop", not a
+ * provider failure, and it is not counted against the circuit breaker.
+ */
+export const generateStream = async (prompt, { feature = "unknown", onUsage, onToken = () => {}, signal } = {}) => {
+  const model = modelForFeature(feature);
+  const startedAt = Date.now();
+  const openai = getClient();
+
+  let reply = "";
+  let usage;
+  try {
+    await providerBreaker.run(
+      async () => {
+        const stream = await openai.chat.completions.create(
+          { model, messages: [{ role: "user", content: prompt }], stream: true, stream_options: { include_usage: true } },
+          { signal }
+        );
+        for await (const chunk of stream) {
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (delta) {
+            reply += delta;
+            onToken(delta);
+          }
+          if (chunk.usage) usage = chunk.usage;
+        }
+        // The SDK ends the iteration quietly on abort instead of throwing — without
+        // this, a half-finished answer would flow on and be saved as if complete.
+        if (signal?.aborted) throw Object.assign(new Error("Generation aborted"), { name: "AbortError" });
+      },
+      // A client hanging up says nothing about the provider's health.
+      { isFailure: (err) => !signal?.aborted && isProviderFailure(err) }
+    );
+  } catch (err) {
+    if (signal?.aborted || err.code === "CIRCUIT_OPEN") throw err;
+    const wrapped = new Error(`AI generation failed: ${err.message}`);
+    wrapped.statusCode = 502;
+    throw wrapped;
+  }
+
+  const costUsd = estimateCostUsd(model, usage);
+  const latencyMs = Date.now() - startedAt;
+  logger.info(
+    { feature, model, streamed: true, promptTokens: usage?.prompt_tokens ?? null, completionTokens: usage?.completion_tokens ?? null, estimatedCostUsd: costUsd, latencyMs },
+    "LLM call completed"
+  );
+  if (onUsage) onUsage({ costUsd, usage, model, latencyMs });
+
+  return reply;
+};

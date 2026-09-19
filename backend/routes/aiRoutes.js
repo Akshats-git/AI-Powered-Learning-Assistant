@@ -5,6 +5,7 @@ import {
   generateSummary,
   explainConcept,
   chatWithDocument,
+  chatStream,
   getChatHistory,
 } from "../controllers/aiController.js";
 import { protect } from "../middlewares/authMiddleware.js";
@@ -32,6 +33,7 @@ router.post("/generate-quiz", validate(generateQuizSchema), idempotent, generate
 router.post("/summary", validate(summarySchema), generateSummary);
 router.post("/explain", validate(explainSchema), explainConcept);
 router.post("/chat", validate(chatSchema), idempotent, chatWithDocument);
+router.post("/chat/stream", validate(chatSchema), chatStream);
 router.get("/chat-history/:documentId", validate(chatHistoryParamsSchema), getChatHistory);
 
 export default router;

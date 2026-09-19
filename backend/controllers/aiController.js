@@ -3,7 +3,7 @@ import Quiz from "../models/Quiz.js";
 import ChatHistory from "../models/ChatHistory.js";
 import Chunk from "../models/Chunk.js";
 import { getOwnedDocument } from "../utils/getOwnedDocument.js";
-import { generate } from "../utils/aiClient.js";
+import { generate, generateStream } from "../utils/aiClient.js";
 import { withInFlightGuard } from "../utils/inFlightGuard.js";
 import { assertWithinBudget, recordSpend } from "../utils/aiBudget.js";
 import { recordLlmCall, recordCacheHit } from "../utils/llmLedger.js";
@@ -295,8 +295,16 @@ const buildChatPrompt = async ({ document, message, recentHistory, searchQuery, 
   return { prompt: retrievalChatPrompt(retrievedContext, recentHistory, message), sources: filterRelevantSources(toSources(results, { query: searchQuery, pageMap: document.pageMap })), retrievedContext };
 };
 
-export const chatWithDocument = async (req, res, next) => {
-  try {
+/**
+ * The whole chat pipeline, shared by the JSON endpoint and the SSE one.
+ *
+ * @param onSources called as soon as retrieval has decided what to cite — before
+ *   generation — so a streaming client can show sources while text arrives.
+ * @param generateReply `(prompt, onUsage) => Promise<string>` — the only part
+ *   that differs between the two transports (one-shot vs. token stream).
+ * @returns `{ reply, sources, groundedness, messages }`
+ */
+const runChat = async (req, { onSources = () => {}, generateReply }) => {
     const { documentId, message } = req.body;
     const document = await getOwnedDocument(documentId, req.user._id);
     assertHasText(document);
@@ -327,6 +335,7 @@ export const chatWithDocument = async (req, res, next) => {
     if (cached) {
       ({ reply, sources, groundedness } = cached);
       await recordCacheHit(req.user._id, req.id, "chat");
+      onSources(sources);
     } else {
       const { prompt, sources: freshSources, retrievedContext } = await buildChatPrompt({
         document,
@@ -338,13 +347,11 @@ export const chatWithDocument = async (req, res, next) => {
         requestId: req.id,
       });
       sources = freshSources;
+      onSources(sources);
 
       let usageInfo = null;
-      reply = await generate(prompt, {
-        feature: "chat",
-        onUsage: (info) => {
-          usageInfo = info;
-        },
+      reply = await generateReply(prompt, (info) => {
+        usageInfo = info;
       });
       await recordSpend(req.user._id, usageInfo?.costUsd || 0);
       await recordLlmCall(req.user._id, req.id, "chat", usageInfo);
@@ -381,12 +388,77 @@ export const chatWithDocument = async (req, res, next) => {
           },
         },
       },
-      { new: true, upsert: true }
+      { returnDocument: "after", upsert: true }
     );
 
-    res.status(200).json({ reply, sources, groundedness, messages: chat.messages });
+    return { reply, sources, groundedness, messages: chat.messages };
+};
+
+export const chatWithDocument = async (req, res, next) => {
+  try {
+    const result = await runChat(req, {
+      generateReply: (prompt, onUsage) => generate(prompt, { feature: "chat", onUsage }),
+    });
+    res.status(200).json(result);
   } catch (err) {
     next(err);
+  }
+};
+
+/**
+ * POST /api/ai/chat/stream — the same pipeline, but the answer arrives as
+ * Server-Sent Events so the first words show up in ~a second instead of after
+ * the whole completion:
+ *
+ *   event: sources  data: {sources}                  (once, before any text)
+ *   event: token    data: {text}                     (many)
+ *   event: done     data: {reply, sources, groundedness, messages}
+ *   event: error    data: {code, message}            (only after streaming began)
+ *
+ * A failure *before* the first event is an ordinary JSON error response (401,
+ * 404, 429 budget, 503 breaker...), so clients handle those exactly as they do
+ * for the non-streaming endpoint. If the client hangs up mid-answer the upstream
+ * request is aborted — no paying for tokens nobody will read — and nothing is
+ * saved to the chat history.
+ */
+export const chatStream = async (req, res, next) => {
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+
+  let started = false;
+  const send = (event, data) => {
+    if (res.writableEnded || res.destroyed) return;
+    if (!started) {
+      started = true;
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        // Tell nginx-style proxies not to buffer the stream.
+        "X-Accel-Buffering": "no",
+      });
+    }
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const result = await runChat(req, {
+      onSources: (sources) => send("sources", { sources }),
+      generateReply: (prompt, onUsage) =>
+        generateStream(prompt, { feature: "chat", onUsage, signal: controller.signal, onToken: (text) => send("token", { text }) }),
+    });
+    send("done", result);
+    res.end();
+  } catch (err) {
+    if (controller.signal.aborted) {
+      logger.info({ requestId: req.id }, "Chat stream aborted by the client");
+      return res.end();
+    }
+    if (!started) return next(err);
+    send("error", { code: err.code || "STREAM_ERROR", message: err.message });
+    res.end();
   }
 };
 

@@ -48,6 +48,7 @@ export const API_PATHS = {
     EXPORT: (id) => `/api/quizzes/${id}/export`,
     DELETE: (id) => `/api/quizzes/${id}`,
   },
+  SEARCH: "/api/search",
   DASHBOARD: {
     OVERVIEW: "/api/dashboard/overview",
   },

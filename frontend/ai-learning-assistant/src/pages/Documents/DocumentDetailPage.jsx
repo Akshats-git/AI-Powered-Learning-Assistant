@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, Info } from "lucide-react";
 
 import { usePageTitle } from "../../hooks/usePageTitle";
@@ -22,7 +22,9 @@ const DocumentDetailPage = () => {
   const { id } = useParams();
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("content");
+  const [searchParams] = useSearchParams();
+  // ?tab=chat deep-links straight to a tab (search results land on the chat, for one).
+  const [activeTab, setActiveTab] = useState(() => (TABS.some((t) => t.key === searchParams.get("tab")) ? searchParams.get("tab") : "content"));
   const [pdfPage, setPdfPage] = useState(null);
   usePageTitle(document?.title);
 

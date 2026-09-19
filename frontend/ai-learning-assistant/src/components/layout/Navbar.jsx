@@ -1,4 +1,4 @@
-import { Bell, Menu } from "lucide-react";
+import { Bell, Menu, Search } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 
 const initialsOf = (name) =>
@@ -9,7 +9,7 @@ const initialsOf = (name) =>
     .map((w) => w[0]?.toUpperCase())
     .join("");
 
-const Navbar = ({ onMenuClick }) => {
+const Navbar = ({ onMenuClick, onSearchClick }) => {
   const { user } = useAuth();
 
   return (
@@ -25,6 +25,15 @@ const Navbar = ({ onMenuClick }) => {
       <div className="hidden lg:block" />
 
       <div className="flex items-center gap-4">
+        <button
+          onClick={onSearchClick}
+          aria-label="Search"
+          className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 sm:rounded-lg sm:border sm:border-gray-200 sm:px-3 sm:py-1.5 sm:hover:bg-gray-50"
+        >
+          <Search className="w-5 h-5 sm:w-4 sm:h-4" />
+          <span className="hidden sm:inline">Search</span>
+          <kbd className="hidden sm:inline rounded border border-gray-200 px-1 text-[10px]">Ctrl K</kbd>
+        </button>
         <button className="text-gray-400 hover:text-gray-600 relative" aria-label="Notifications">
           <Bell className="w-5 h-5" />
         </button>

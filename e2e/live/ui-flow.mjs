@@ -285,6 +285,32 @@ await step(page, "Dashboard reflects real data: 1 document, 10 flashcards, 1 qui
   await shot("17-dashboard-full");
 });
 
+await step(page, "Ctrl+K palette: searches across chat, opens the result on the chat tab, and Esc closes it", async () => {
+  await page.goto(FRONT + "/dashboard");
+  await page.getByText("Weak Areas").waitFor();
+  await page.keyboard.press("Control+k");
+  const box = page.getByRole("combobox", { name: /search or jump to/i });
+  await box.waitFor();
+  expect(await box.evaluate((el) => el === document.activeElement), "palette input should be focused");
+  await box.fill("Vandermonde");
+  await page.getByRole("option", { name: /Biology & Math Reader/ }).first().waitFor();
+  await page.screenshot({ path: path.join(SHOTS, "25-command-palette.png") });
+  await page.keyboard.press("Enter");
+  await page.waitForURL(/\/documents\/[a-f0-9]{24}\?tab=chat$/);
+  await page.getByPlaceholder(/Ask a question/).waitFor(); // deep link landed on the Chat tab
+  await page.keyboard.press("Control+k");
+  await box.waitFor();
+  await page.keyboard.press("Escape");
+  await box.waitFor({ state: "detached" });
+});
+await step(page, "'?' opens the keyboard shortcuts sheet (and typing '?' in a field does not)", async () => {
+  await page.goto(FRONT + "/dashboard");
+  await page.getByText("Weak Areas").waitFor();
+  await page.keyboard.press("?");
+  await page.getByRole("dialog", { name: "Keyboard shortcuts" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+});
 await step(page, "Profile: sessions list, API-key settings and password form all render", async () => {
   await page.goto(FRONT + "/profile");
   await page.getByText(/active sessions/i).first().waitFor({ timeout: 8000 });

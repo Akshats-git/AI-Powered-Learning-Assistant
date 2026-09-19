@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { GraduationCap, LayoutDashboard, FileText, Layers, HelpCircle, User, ShieldCheck, LogOut, X, Flame } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
@@ -16,6 +17,16 @@ const ADMIN_NAV_ITEM = { to: "/admin/costs", label: "Cost Dashboard", icon: Shie
 const Sidebar = ({ isOpen, onClose }) => {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  // The mobile drawer is a modal overlay too: Escape should dismiss it.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   const navItems = user?.isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   const handleLogout = () => {

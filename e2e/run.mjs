@@ -1,4 +1,6 @@
 import { spawn } from "child_process";
+import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { MongoMemoryServer } from "mongodb-memory-server";
@@ -17,8 +19,12 @@ const FRONTEND_URL = `http://127.0.0.1:${FRONTEND_PORT}`;
 
 const children = [];
 
+// detached: each child gets its own process group so killAll can take down the
+// whole tree. `npm run dev` is npm -> sh -> vite; signalling only the npm pid
+// (what this used to do) left Vite running after every run, holding the port
+// and this script's stdout open.
 const spawnChild = (command, args, options) => {
-  const child = spawn(command, args, { stdio: "inherit", ...options });
+  const child = spawn(command, args, { stdio: "inherit", detached: true, ...options });
   children.push(child);
   return child;
 };
@@ -39,9 +45,24 @@ const waitForHttp = async (url, { timeoutMs = 30_000, intervalMs = 300 } = {}) =
 
 const killAll = () => {
   for (const child of children) {
-    if (!child.killed) child.kill("SIGTERM");
+    try {
+      process.kill(-child.pid, "SIGTERM");
+    } catch {
+      // already gone
+    }
   }
 };
+
+// Children are detached, so a Ctrl-C on this script no longer reaches them by itself.
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    killAll();
+    process.exit(130);
+  });
+}
+
+// Uploads go to a throwaway directory instead of the real backend/uploads.
+const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), "learning-assistant-e2e-uploads-"));
 
 let mongod;
 let exitCode = 1;
@@ -61,6 +82,7 @@ try {
       JWT_SECRET: "e2e-test-secret-do-not-use-in-production",
       JWT_EXPIRES_IN: "1h",
       CLIENT_URL: FRONTEND_URL,
+      UPLOAD_DIR: uploadDir,
       // Left unset on purpose: E2E only covers non-AI journeys (auth, upload,
       // document list), so the backend runs without an OpenAI key.
       OPENAI_API_KEY: "",
@@ -92,6 +114,7 @@ try {
 } finally {
   console.log("[e2e] tearing down...");
   killAll();
+  fs.rmSync(uploadDir, { recursive: true, force: true });
   if (mongod) await mongod.stop();
 }
 

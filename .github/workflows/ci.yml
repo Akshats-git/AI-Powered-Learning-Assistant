@@ -90,6 +90,17 @@ jobs:
         working-directory: e2e
       - run: npm test
         working-directory: e2e
+      # Full-product journeys against a fake OpenAI server (see e2e/README.md).
+      - run: npm run test:api
+        working-directory: e2e
+      - run: npm run test:ui
+        working-directory: e2e
+      - name: Upload journey artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-live-out
+          path: e2e/live/out
 
   codeql:
     name: CodeQL

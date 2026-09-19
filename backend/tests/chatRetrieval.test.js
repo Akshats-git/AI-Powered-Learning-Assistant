@@ -213,6 +213,39 @@ describe("POST /api/ai/chat — retrieval wiring", () => {
     expect(res.body.sources[0].relevance).toBe(10);
   });
 
+  it("gives each source the exact page of the matching passage, and keeps it in the persisted chat history the UI renders", async () => {
+    process.env.OPENAI_API_KEY = "sk-test";
+    embedTexts.mockResolvedValue([[1, 0, 0]]);
+
+    const { user, token } = await createUserWithToken();
+    const document = await makeDocument(user._id);
+    // Page 1 = chars 0..99, page 2 = chars 101..300. The chunk starts on page 1 but
+    // the passage that answers the question sits at offset 150 — on page 2.
+    await Document.updateOne({ _id: document._id }, { $set: { pageMap: [{ page: 1, start: 0, end: 99 }, { page: 2, start: 101, end: 300 }] } });
+    const filler = "unrelated words about nothing in particular ".repeat(4);
+    await Chunk.create({
+      user: user._id, document: document._id, index: 0, page: 1, endPage: 2, sectionPath: [], charStart: 0, charEnd: 300, tokens: 60, contentHash: "pagemap-1",
+      embedding: [1, 0, 0],
+      text: `${filler.slice(0, 150)} The mitochondria produce ATP through oxidative phosphorylation. ${filler}`,
+    });
+
+    const res = await request(app)
+      .post("/api/ai/chat")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ documentId: document._id.toString(), message: "How do mitochondria produce ATP?" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sources[0]).toMatchObject({ page: 1, endPage: 2, snippetPage: 2 });
+    expect(res.body.sources[0].snippet).toContain("oxidative phosphorylation");
+
+    // The UI renders the persisted copy (and a reload only has that one) — the
+    // ChatHistory schema is strict, so a field it doesn't declare vanishes here.
+    const history = await request(app).get(`/api/ai/chat-history/${document._id}`).set("Authorization", `Bearer ${token}`);
+    const assistant = history.body.find((m) => m.role === "assistant");
+    expect(assistant.sources[0].snippetPage).toBe(2);
+    expect(res.body.messages.find((m) => m.role === "assistant").sources[0].snippetPage).toBe(2);
+  });
+
   it("keeps every retrieved chunk as a source when reranking never ran (nothing to filter on)", async () => {
     process.env.OPENAI_API_KEY = "sk-test";
     embedTexts.mockResolvedValue([[1, 0, 0]]);

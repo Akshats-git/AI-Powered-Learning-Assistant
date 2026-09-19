@@ -11,6 +11,12 @@ const sourceSchema = new mongoose.Schema(
     endPage: { type: Number, default: null },
     sectionPath: { type: [String], default: [] },
     snippet: { type: String, default: "" },
+    // Exact page of the snippet (a chunk's page..endPage range can span several)
+    // and the reranker's 0-10 score. Left undefined, not null, when unknown —
+    // this schema is strict, so any field toSources() adds that isn't declared
+    // here is silently dropped from the persisted history the UI renders.
+    snippetPage: { type: Number, default: undefined },
+    relevance: { type: Number, default: undefined },
   },
   { _id: false }
 );

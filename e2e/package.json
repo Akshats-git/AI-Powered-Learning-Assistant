@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node run.mjs"
+    "test": "node run.mjs",
+    "test:api": "node live/api-flow.mjs",
+    "test:ui": "node live/ui-flow.mjs",
+    "test:full": "npm test && npm run test:api && npm run test:ui"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

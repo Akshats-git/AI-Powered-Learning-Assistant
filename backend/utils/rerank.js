@@ -3,6 +3,7 @@ import { assertWithinBudget, recordSpend } from "./aiBudget.js";
 import { recordLlmCall } from "./llmLedger.js";
 import { hasActiveApiKey } from "./aiContext.js";
 import { logger } from "./logger.js";
+import { findBestSnippet } from "./citations.js";
 
 // "Take the fused top-30 and rerank to top-6 with a cross-encoder" — this
 // repo has no cross-encoder model available, so the stand-in is a cheap LLM
@@ -15,9 +16,15 @@ import { logger } from "./logger.js";
 
 const CANDIDATE_PREVIEW_CHARS = 300;
 
-const buildRerankPrompt = (query, candidates) => {
+// The reranker only sees a preview of each candidate, not the whole ~700-token
+// chunk. The preview used to be the chunk's first 300 characters — so a chunk
+// whose *answer* sat further in was scored on its unrelated opening, and (now
+// that citations are filtered by these scores) would be dropped as a source.
+// Showing the passage that best matches the query instead judges each chunk on
+// the part that could actually answer it.
+export const buildRerankPrompt = (query, candidates) => {
   const list = candidates
-    .map((c, i) => `[${i}] ${c.text.slice(0, CANDIDATE_PREVIEW_CHARS)}`)
+    .map((c, i) => `[${i}] ${findBestSnippet(c.text, query, CANDIDATE_PREVIEW_CHARS).snippet.replace(/\s+/g, " ")}`)
     .join("\n\n");
 
   return `Rate how relevant each excerpt is to the question below, on a 0-10 scale (10 = directly answers it, 0 = unrelated).

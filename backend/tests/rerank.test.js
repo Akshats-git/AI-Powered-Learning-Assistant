@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyRerankScores } from "../utils/rerank.js";
+import { applyRerankScores, buildRerankPrompt } from "../utils/rerank.js";
 
 const candidates = [
   { id: "a", text: "General discussion of cellular respiration." },
@@ -59,5 +59,22 @@ describe("applyRerankScores", () => {
 
     expect(reordered).toHaveLength(3);
     expect(reordered.map((c) => c.id)).toContain("b");
+  });
+});
+
+describe("buildRerankPrompt", () => {
+  it("previews the passage that matches the query, not the chunk's unrelated opening", () => {
+    const filler = "Lorem ipsum dolor sit amet consectetur adipiscing elit. ".repeat(20);
+    const prompt = buildRerankPrompt("What does Theorem 4.2 state?", [
+      { text: `${filler}Theorem 4.2 states that bounded monotone sequences converge. ${filler}` },
+    ]);
+
+    expect(prompt).toContain("Theorem 4.2 states that bounded monotone sequences converge");
+  });
+
+  it("keeps each preview on one line so the [index] list stays parseable", () => {
+    const prompt = buildRerankPrompt("atp", [{ text: "line one\n\nline two about ATP\nline three" }, { text: "other" }]);
+    const lines = prompt.split("\n").filter((l) => /^\[\d+\] /.test(l));
+    expect(lines).toHaveLength(2);
   });
 });

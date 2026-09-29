@@ -1,9 +1,10 @@
-// End-to-end over real sockets: a consumer node discovers across the network,
+// End-to-end over real sockets: a consumer node discovers across the subnet,
 // then walks one provider node through select -> init -> confirm -> status.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startNetwork } from "../beckn/network.js";
-import { buildItem } from "../beckn/bpp/catalog.js";
+import { buildResource, buildOffer, conceptFilter, priceOf } from "../beckn/bpp/catalog.js";
+import { validateComponent } from "../beckn/core/validate.js";
 
 const silent = { warn: () => {}, info: () => {}, error: () => {} };
 
@@ -16,8 +17,17 @@ const postJson = async (url, body) => {
   return { status: response.status, body: await response.json() };
 };
 
+const commitmentFor = (resourceId, offerId) => ({
+  status: { descriptor: { code: "DRAFT" } },
+  resources: [{ id: resourceId, quantity: 1 }],
+  offer: { id: offerId, resourceIds: [resourceId] },
+});
+
 describe("beckn end-to-end flow", () => {
   let network;
+  let discoverUrl;
+
+  const discover = (intent) => postJson(discoverUrl, { intent });
 
   beforeAll(async () => {
     network = await startNetwork({
@@ -28,19 +38,29 @@ describe("beckn end-to-end flow", () => {
         {
           subscriberId: "provider-b.learn.local",
           provider: { id: "open-university", descriptor: { name: "Open University" } },
-          items: [
-            buildItem({
+          resources: [
+            buildResource({
               id: "course-graphs-advanced",
               name: "Advanced graph theory",
               shortDesc: "Flow networks, matchings and planarity",
               kind: "course",
               concepts: ["graphs", "dijkstra", "max-flow"],
-              price: 999,
+              level: "advanced",
+              durationMinutes: 300,
+            }),
+          ],
+          offers: [
+            buildOffer({
+              id: "offer-graphs-advanced",
+              resourceIds: ["course-graphs-advanced"],
+              name: "Course enrolment",
+              value: 999,
             }),
           ],
         },
       ],
     });
+    discoverUrl = `${network.consumer.url}/api/network/discover`;
   });
 
   afterAll(async () => {
@@ -56,84 +76,94 @@ describe("beckn end-to-end flow", () => {
     expect(Buffer.from(key, "base64")).toHaveLength(32);
   });
 
-  it("fans a concept search out to every provider node and merges the catalogs", async () => {
-    const { body } = await postJson(`${network.consumer.url}/api/network/discover`, {
-      intent: { tags: [{ descriptor: { code: "concept" }, value: "dijkstra" }] },
-    });
+  it("fans a concept filter out to every provider node and merges the catalogs", async () => {
+    const { body } = await discover({ filters: conceptFilter("dijkstra") });
 
     expect(body.transactionId).toBeTruthy();
-    // Both providers carry something tagged dijkstra.
-    expect(body.providers).toHaveLength(2);
+    expect(body.catalogs).toHaveLength(2);
 
-    const names = body.providers.flatMap((p) => p.items.map((i) => i.descriptor.name)).sort();
+    const names = body.catalogs.flatMap((c) => c.resources.map((r) => r.descriptor.name)).sort();
     expect(names).toContain("Advanced graph theory");
     expect(names).toContain("Shortest paths — practice quiz");
   });
 
-  it("returns only matching items, not the whole catalog", async () => {
-    const { body } = await postJson(`${network.consumer.url}/api/network/discover`, {
-      intent: { tags: [{ descriptor: { code: "concept" }, value: "linear-algebra" }] },
-    });
+  it("returns catalogs that validate against the pinned Catalog schema", async () => {
+    const { body } = await discover({ filters: conceptFilter("dijkstra") });
 
-    const items = body.providers.flatMap((p) => p.items);
-    expect(items).toHaveLength(1);
-    expect(items[0].id).toBe("course-linear-algebra");
+    for (const catalog of body.catalogs) {
+      expect(validateComponent("Catalog", catalog)).toEqual({ valid: true, errors: "" });
+    }
   });
 
-  it("matches free text against the descriptor when no concept tag is given", async () => {
-    const { body } = await postJson(`${network.consumer.url}/api/network/discover`, {
-      intent: { item: { descriptor: { name: "dynamic programming" } } },
-    });
+  it("carries only the offers covering the resources that matched", async () => {
+    const { body } = await discover({ filters: conceptFilter("linear-algebra") });
 
-    const items = body.providers.flatMap((p) => p.items);
-    expect(items.map((i) => i.id)).toEqual(["course-dp-foundations"]);
+    const [catalog] = body.catalogs;
+    expect(catalog.resources.map((r) => r.id)).toEqual(["course-linear-algebra"]);
+    expect(catalog.offers.map((o) => o.id)).toEqual(["offer-course-linear-algebra"]);
+    expect(priceOf(catalog.offers[0])).toEqual({ currency: "INR", value: 799 });
   });
 
-  it("walks select -> init -> confirm -> status and ends with an active order", async () => {
-    const discovered = await postJson(`${network.consumer.url}/api/network/discover`, {
-      intent: { tags: [{ descriptor: { code: "concept" }, value: "dynamic-programming" }] },
-    });
-    const { transactionId } = discovered.body;
-    const order = { items: [{ id: "course-dp-foundations" }] };
+  it("matches free text against descriptors and concepts", async () => {
+    const { body } = await discover({ textSearch: "dynamic programming" });
+
+    const resources = body.catalogs.flatMap((c) => c.resources);
+    expect(resources.map((r) => r.id)).toEqual(["course-dp-foundations"]);
+  });
+
+  it("returns no catalogs rather than failing when nothing matches", async () => {
+    const { body } = await discover({ filters: conceptFilter("quantum-chromodynamics") });
+    expect(body.catalogs).toEqual([]);
+  });
+
+  it("walks select -> init -> confirm -> status and ends with an active contract", async () => {
+    const { body: discovered } = await discover({ filters: conceptFilter("dynamic-programming") });
+    const { transactionId } = discovered;
     const base = { providerSubscriberId: "provider-a.learn.local", transactionId };
+    const commitments = [commitmentFor("course-dp-foundations", "offer-course-dp-foundations")];
+    const participants = [{ id: "learner-1", descriptor: { name: "Akshat" } }];
 
-    const selected = await postJson(`${network.consumer.url}/api/network/select`, { ...base, message: { order } });
-    expect(selected.body.order.quote.price.value).toBe("499");
+    const selected = await postJson(`${network.consumer.url}/api/network/select`, {
+      ...base,
+      message: { contract: { commitments } },
+    });
+    expect(selected.body.contract.consideration[0].considerationAttributes.price).toBe("499");
+    expect(selected.body.contract.status.code).toBe("DRAFT");
 
     const initialised = await postJson(`${network.consumer.url}/api/network/init`, {
       ...base,
-      message: { order: { ...order, billing: { name: "Akshat", email: "learner@example.com" } } },
+      message: { contract: { commitments, participants } },
     });
-    expect(initialised.body.order.fulfillment.state.descriptor.code).toBe("PAYMENT_PENDING");
+    expect(initialised.body.contract.performance[0].status.code).toBe("PAYMENT_PENDING");
 
     const confirmed = await postJson(`${network.consumer.url}/api/network/confirm`, {
       ...base,
-      message: { order: { ...order, billing: { name: "Akshat", email: "learner@example.com" } } },
+      message: { contract: { commitments, participants } },
     });
-    expect(confirmed.body.order.id).toMatch(/^order-/);
-    expect(confirmed.body.order.state).toBe("ACTIVE");
-    expect(confirmed.body.order.fulfillment.state.descriptor.code).toBe("ENROLLED");
+    const { contract } = confirmed.body;
+    expect(contract.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(contract.status.code).toBe("ACTIVE");
+    expect(contract.performance[0].status.code).toBe("ENROLLED");
+    expect(validateComponent("Contract", contract)).toEqual({ valid: true, errors: "" });
 
     const status = await postJson(`${network.consumer.url}/api/network/status`, {
       ...base,
-      message: { orderId: confirmed.body.order.id },
+      message: { contract: { id: contract.id, commitments: contract.commitments } },
     });
-    expect(status.body.order.id).toBe(confirmed.body.order.id);
-    expect(status.body.order.state).toBe("ACTIVE");
+    expect(status.body.contract.id).toBe(contract.id);
+    expect(status.body.contract.status.code).toBe("ACTIVE");
   });
 
-  it("keeps one journey under a single transactionId across every action", async () => {
-    const discovered = await postJson(`${network.consumer.url}/api/network/discover`, {
-      intent: { tags: [{ descriptor: { code: "concept" }, value: "graphs" }] },
-    });
-    const { transactionId } = discovered.body;
+  it("keeps one journey under a single transactionId across providers", async () => {
+    const { body: discovered } = await discover({ filters: conceptFilter("graphs") });
 
     const selected = await postJson(`${network.consumer.url}/api/network/select`, {
       providerSubscriberId: "provider-b.learn.local",
-      transactionId,
-      message: { order: { items: [{ id: "course-graphs-advanced" }] } },
+      transactionId: discovered.transactionId,
+      message: { contract: { commitments: [commitmentFor("course-graphs-advanced", "offer-graphs-advanced")] } },
     });
+
     expect(selected.status).toBe(200);
-    expect(selected.body.order.items[0].id).toBe("course-graphs-advanced");
+    expect(selected.body.contract.consideration[0].considerationAttributes.price).toBe("999");
   });
 });

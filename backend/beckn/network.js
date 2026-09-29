@@ -26,7 +26,7 @@ const close = (server) => new Promise((resolve) => server.close(resolve));
 
 /**
  * @param providers descriptors for the provider nodes to start:
- *   [{ subscriberId, items, provider }]
+ *   [{ subscriberId, resources, offers, provider }]
  */
 export const startNetwork = async ({
   providers = [{ subscriberId: "provider.learn.local" }],
@@ -63,7 +63,8 @@ export const startNetwork = async ({
     const app = createBppApp({
       identity,
       lookupKey: registry.lookupKey,
-      items: descriptor.items,
+      resources: descriptor.resources,
+      offers: descriptor.offers,
       provider: descriptor.provider,
       logger,
       now,

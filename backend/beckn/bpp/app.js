@@ -1,36 +1,56 @@
-// The provider node (PN, formerly BPP).
+// The provider node (PN — v2's name for what v1 called a BPP).
 //
-// Every forward action follows the same asynchronous shape: verify the
-// signature, ACK immediately, then send the business result to the consumer
-// node's matching `/on_*` endpoint as a separate signed request. The ACK is
-// not the answer — it only means the request was accepted.
+// Every forward action has the same asynchronous shape: verify the signature,
+// validate against the pinned schema, ACK, then deliver the business result to
+// the consumer node's matching `/on_*` endpoint as a separate signed request.
+// The ACK is not the answer.
 //
-// Callbacks are fired without awaiting so the ACK is not held behind a peer
-// that may be slow; a callback that fails is logged and dropped rather than
-// retried forever, which is the right MVP trade-off but is the first thing a
-// production node would replace with a durable queue.
+// Callbacks go to `context.bapUri`, which the spec requires to match the
+// subscriber_url from a registry lookup. They are validated before being sent:
+// emitting an invalid callback is this node's own bug, and it should be caught
+// here rather than by the peer.
 
+import crypto from "crypto";
 import express from "express";
-import { rawBodyJson, verifySignature, requireContext } from "../core/middleware.js";
-import { ACK, NACK_BAD_REQUEST } from "../core/ack.js";
-import { replyContext } from "../core/context.js";
+import { rawBodyJson, verifySignature, validateRequest } from "../core/middleware.js";
+import { ack, nackBadRequest, ERROR_CODES } from "../core/ack.js";
+import { replyContext, callbackUrlFor } from "../core/context.js";
 import { postSigned } from "../core/client.js";
-import { DEFAULT_ITEMS, DEFAULT_PROVIDER, matchItems } from "./catalog.js";
+import { validateMessage } from "../core/validate.js";
+import {
+  DEFAULT_RESOURCES,
+  DEFAULT_OFFERS,
+  DEFAULT_PROVIDER,
+  matchResources,
+  buildCatalog,
+  priceOf,
+  UnsupportedFilterError,
+} from "./catalog.js";
 
-const quoteFor = (items) => ({
-  price: {
-    currency: "INR",
-    value: String(items.reduce((total, item) => total + Number(item.price.value), 0)),
-  },
-  breakup: items.map((item) => ({ itemId: item.id, title: item.descriptor.name, price: item.price })),
-});
+const BILLING_CONTEXT = "https://schema.org";
+
+const considerationFor = (offers) => {
+  const total = offers.reduce((sum, offer) => sum + priceOf(offer).value, 0);
+  return [
+    {
+      id: "total",
+      considerationAttributes: {
+        "@context": BILLING_CONTEXT,
+        "@type": "PriceSpecification",
+        priceCurrency: offers[0] ? priceOf(offers[0]).currency : "INR",
+        price: String(total),
+      },
+    },
+  ];
+};
 
 export const createBppApp = ({
   identity,
   lookupKey,
-  items = DEFAULT_ITEMS,
+  resources = DEFAULT_RESOURCES,
+  offers = DEFAULT_OFFERS,
   provider = DEFAULT_PROVIDER,
-  orders = new Map(),
+  contracts = new Map(),
   seenMessageIds = new Set(),
   logger = console,
   fetchImpl = fetch,
@@ -41,28 +61,55 @@ export const createBppApp = ({
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
   app.use(verifySignature({ lookupKey, now, logger }));
 
-  const callback = async (context, message) => {
-    const replyTo = context.senderUri;
-    if (!replyTo) return logger.warn?.("beckn bpp: no senderUri to call back to");
+  // Resolves what the consumer selected into the resources and offers it
+  // names, failing loudly on anything unknown.
+  const resolveSelection = (contract) => {
+    const commitments = contract?.commitments || [];
+    const chosenResources = [];
+    const chosenOffers = [];
 
-    const reply = replyContext(context, { senderUri: identity.uri, now });
+    for (const commitment of commitments) {
+      for (const requested of commitment.resources || []) {
+        const resource = resources.find((candidate) => candidate.id === requested.id);
+        if (!resource) throw Object.assign(new Error(`unknown resource ${requested.id}`), { code: ERROR_CODES.BIZ_ITEM_NOT_FOUND });
+        chosenResources.push({ ...resource, quantity: requested.quantity ?? 1 });
+      }
+      const offer = offers.find((candidate) => candidate.id === commitment.offer?.id);
+      if (!offer) throw Object.assign(new Error(`unknown offer ${commitment.offer?.id}`), { code: ERROR_CODES.BIZ_OFFER_NOT_FOUND });
+      chosenOffers.push(offer);
+    }
+    return { chosenResources, chosenOffers };
+  };
+
+  const commitmentsFrom = (chosenResources, chosenOffers, statusCode) =>
+    chosenOffers.map((offer, index) => ({
+      id: `commitment-${index + 1}`,
+      status: { descriptor: { code: statusCode } },
+      resources: chosenResources
+        .filter((resource) => offer.resourceIds.includes(resource.id))
+        .map((resource) => ({ id: resource.id, descriptor: resource.descriptor, quantity: resource.quantity })),
+      offer: { id: offer.id, resourceIds: offer.resourceIds },
+    }));
+
+  const deliver = async (context, message) => {
+    const reply = replyContext(context, { now });
+    const url = callbackUrlFor(context);
+    if (!url) return logger.warn?.("beckn pn: no bapUri to call back to");
+
+    const { valid, errors } = validateMessage(reply.action, message);
+    if (!valid) return logger.error?.(`beckn pn: refusing to send invalid ${reply.action} — ${errors}`);
+
     try {
-      await postSigned({
-        url: `${replyTo}/${reply.action}`,
-        payload: { context: reply, message },
-        identity,
-        fetchImpl,
-        now,
-      });
+      await postSigned({ url: `${url}/${reply.action}`, payload: { context: reply, message }, identity, fetchImpl, now });
     } catch (err) {
-      logger.warn?.(`beckn bpp: callback ${reply.action} to ${replyTo} failed — ${err.message}`);
+      logger.warn?.(`beckn pn: callback ${reply.action} to ${url} failed — ${err.message}`);
     }
   };
 
-  // A retried request must not create a second order. Beckn's messageId is the
-  // idempotency key: the same one means the same request, so it is ACKed again
-  // (the peer may simply have missed the first ACK) without re-running the
-  // effect. This mirrors the app's existing IdempotencyKey model.
+  // A retried request must not create a second contract. The spec names
+  // messageId as the duplicate-detection key, so the same one means the same
+  // request: ACK it again (the peer may have missed the first ACK) without
+  // re-running the effect.
   const isReplay = (context) => {
     const key = `${context.action}:${context.messageId}`;
     if (seenMessageIds.has(key)) return true;
@@ -71,75 +118,101 @@ export const createBppApp = ({
   };
 
   const handle = (action, buildMessage) => [
-    requireContext(action),
+    validateRequest(action),
     (req, res) => {
       const { context, message } = req.body;
-      res.json(ACK());
-      if (isReplay(context)) return logger.info?.(`beckn bpp: replayed ${action} ${context.messageId}, not re-run`);
+      res.json(ack(context));
+      if (isReplay(context)) return logger.info?.(`beckn pn: replayed ${action} ${context.messageId}, not re-run`);
 
       let result;
       try {
-        result = buildMessage(message || {}, context);
+        result = buildMessage(message, context);
       } catch (err) {
-        return logger.warn?.(`beckn bpp: ${action} failed — ${err.message}`);
+        return logger.warn?.(`beckn pn: ${action} failed — ${err.message}`);
       }
-      callback(context, result);
+      deliver(context, result);
     },
   ];
 
-  app.post("/discover", ...handle("discover", (message) => ({
-    catalog: {
-      descriptor: provider.descriptor,
-      providers: [{ ...provider, items: matchItems(items, message.intent) }],
-    },
-  })));
+  app.post("/discover", ...handle("discover", (message, context) => {
+    let matched;
+    try {
+      matched = matchResources(resources, message.intent);
+    } catch (err) {
+      if (err instanceof UnsupportedFilterError) {
+        logger.warn?.(`beckn pn: ${err.message}`);
+        return { catalogs: [] };
+      }
+      throw err;
+    }
+    if (!matched.length) return { catalogs: [] };
+
+    return {
+      catalogs: [
+        {
+          ...buildCatalog({ id: `${provider.id}-catalog`, provider, resources: matched, offers }),
+          bppId: identity.subscriberId,
+          bppUri: identity.uri,
+        },
+      ],
+    };
+  }));
 
   app.post("/select", ...handle("select", (message) => {
-    const selected = (message.order?.items || []).map((selection) => {
-      const item = items.find((candidate) => candidate.id === selection.id);
-      if (!item) throw new Error(`unknown item ${selection.id}`);
-      return item;
-    });
-    return { order: { provider: { id: provider.id }, items: selected, quote: quoteFor(selected) } };
+    const { chosenResources, chosenOffers } = resolveSelection(message.contract);
+    return {
+      contract: {
+        commitments: commitmentsFrom(chosenResources, chosenOffers, "DRAFT"),
+        consideration: considerationFor(chosenOffers),
+        status: { code: "DRAFT" },
+      },
+    };
   }));
 
   app.post("/init", ...handle("init", (message) => {
-    const selected = (message.order?.items || []).map((s) => items.find((i) => i.id === s.id)).filter(Boolean);
+    const { chosenResources, chosenOffers } = resolveSelection(message.contract);
     return {
-      order: {
-        provider: { id: provider.id },
-        items: selected,
-        billing: message.order?.billing,
-        quote: quoteFor(selected),
-        fulfillment: { type: "ONLINE", state: { descriptor: { code: "PAYMENT_PENDING" } } },
+      contract: {
+        commitments: commitmentsFrom(chosenResources, chosenOffers, "DRAFT"),
+        consideration: considerationFor(chosenOffers),
+        participants: message.contract?.participants || [],
+        performance: [{ id: "performance-1", status: { code: "PAYMENT_PENDING" }, commitmentIds: ["commitment-1"] }],
+        status: { code: "DRAFT" },
       },
     };
   }));
 
   app.post("/confirm", ...handle("confirm", (message, context) => {
-    const selected = (message.order?.items || []).map((s) => items.find((i) => i.id === s.id)).filter(Boolean);
-    const order = {
-      id: `order-${context.transactionId.slice(0, 8)}`,
-      provider: { id: provider.id },
-      items: selected,
-      billing: message.order?.billing,
-      quote: quoteFor(selected),
-      state: "ACTIVE",
-      fulfillment: { type: "ONLINE", state: { descriptor: { code: "ENROLLED" } } },
-      createdAt: new Date(now()).toISOString(),
+    const { chosenResources, chosenOffers } = resolveSelection(message.contract);
+
+    // Contract.id is format:uuid in the schema, so it cannot be a readable
+    // slug. Keyed by transactionId so a repeat confirm in the same journey
+    // returns the contract that already exists.
+    const existing = contracts.get(context.transactionId);
+    const contract = existing || {
+      id: crypto.randomUUID(),
+      descriptor: { name: "Course enrolment" },
+      commitments: commitmentsFrom(chosenResources, chosenOffers, "ACTIVE"),
+      consideration: considerationFor(chosenOffers),
+      participants: message.contract?.participants || [],
+      performance: [{ id: "performance-1", status: { code: "ENROLLED" }, commitmentIds: ["commitment-1"] }],
+      status: { code: "ACTIVE" },
     };
-    orders.set(order.id, order);
-    return { order };
+    contracts.set(context.transactionId, contract);
+    return { contract };
   }));
 
   app.post("/status", ...handle("status", (message) => {
-    const order = orders.get(message.orderId);
-    if (!order) throw new Error(`unknown order ${message.orderId}`);
-    return { order };
+    const wanted = message.contract?.id;
+    const contract = [...contracts.values()].find((candidate) => candidate.id === wanted);
+    if (!contract) throw Object.assign(new Error(`unknown contract ${wanted}`), { code: ERROR_CODES.BIZ_ORDER_NOT_FOUND });
+    return { contract };
   }));
 
-  app.use((req, res) => res.status(404).json(NACK_BAD_REQUEST(`unsupported action at ${req.path}`)));
+  app.use((req, res) =>
+    res.status(404).json(nackBadRequest(req.body?.context, `unsupported action at ${req.path}`, ERROR_CODES.NET_NOT_IMPLEMENTED))
+  );
 
-  app.locals.orders = orders;
+  app.locals.contracts = contracts;
   return app;
 };

@@ -83,11 +83,14 @@ export const parseAuthorizationHeader = (header) => {
   return params;
 };
 
+// `code` is a value from the spec's ErrorCode enum, so the NACK a caller
+// receives says *why* in a machine-readable way rather than only in prose.
 export class SignatureError extends Error {
-  constructor(reason) {
+  constructor(reason, code = "AUT_SIGNATURE_INVALID") {
     super(reason);
     this.name = "SignatureError";
     this.reason = reason;
+    this.code = code;
   }
 }
 
@@ -105,7 +108,7 @@ export const verify = async ({
   now = Date.now,
 }) => {
   const params = parseAuthorizationHeader(authorization);
-  if (!params) throw new SignatureError("missing or malformed Authorization header");
+  if (!params) throw new SignatureError("missing or malformed Authorization header", "AUT_SIGNATURE_MISSING");
 
   const parsedKeyId = parseKeyId(params.keyId);
   if (!parsedKeyId) throw new SignatureError("malformed keyId");
@@ -119,7 +122,7 @@ export const verify = async ({
   if (created > nowSeconds + clockSkewSeconds) throw new SignatureError("signature created in the future");
 
   const publicKey = await lookupKey(parsedKeyId);
-  if (!publicKey) throw new SignatureError("unknown subscriber or key");
+  if (!publicKey) throw new SignatureError("unknown subscriber or key", "AUT_SUBSCRIBER_NOT_FOUND");
 
   // The digest is recomputed from the received bytes: a tampered body produces
   // a different digest, a different signing string, and a failed verify.

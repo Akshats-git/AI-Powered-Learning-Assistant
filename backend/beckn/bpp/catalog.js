@@ -1,31 +1,59 @@
-// The provider node's catalog: learning resources, in Beckn's item shape.
+// The provider node's catalog, in the v2 domain model.
 //
-// This is where the learning assistant meets the network. The app already
-// generates summaries, flashcard decks and quizzes from an uploaded document
-// and already tracks which concepts a learner is weak on (utils/bkt.js). Those
-// artifacts are the catalog — each one tagged with the concept it teaches, so
-// a consumer node searching "dijkstra" finds the deck that covers it.
+// v2 does not have "items" and "orders". A Catalog holds Resources (the things
+// on offer) and Offers (what they cost and how they are packaged), and domain
+// detail lives in a JSON-LD `Attributes` object — `{ "@context", "@type", ... }`
+// with anything else allowed — rather than in v1's tag arrays.
 //
-// Beckn has no education domain schema for v2 yet (the DSEP adaptation is v1
-// and unmaintained), so the concept/level/duration tags below are this
-// implementation's own convention. See docs/beckn.md.
+// That matters here because Beckn has no v2 domain schema for education or
+// skilling. DSEP, the v1 adaptation, was last touched in July 2024; the domain
+// repositories carrying v2 work cover agriculture, energy, mobility, tourism,
+// retail, logistics, finance and health. So `@context` below points at a
+// schema this app defines, which is exactly the extension point JSON-LD
+// attributes exist for, and is the part most likely to change if an education
+// domain schema is ever standardised.
+//
+// The resources themselves are what the learning assistant already generates:
+// flashcard decks, quizzes and micro-courses derived from uploaded documents,
+// each tagged with the concepts it teaches.
 
-export const DOMAIN = "education";
+export const EDUCATION_CONTEXT = "https://ai-learning-assistant.example/schemas/education/v1";
+export const EDUCATION_TYPE = "LearningResource";
 
-const tag = (code, value) => ({ descriptor: { code }, value: String(value) });
-
-export const buildItem = ({ id, name, shortDesc, kind, concepts, level = "beginner", durationMinutes, price = 0 }) => ({
+export const buildResource = ({ id, name, shortDesc, kind, concepts, level = "beginner", durationMinutes }) => ({
   id,
   descriptor: { name, shortDesc },
-  category: { id: kind },
-  price: { currency: "INR", value: String(price) },
-  tags: [
-    tag("kind", kind),
-    tag("level", level),
-    tag("durationMinutes", durationMinutes),
-    ...concepts.map((concept) => tag("concept", concept)),
+  resourceAttributes: {
+    "@context": EDUCATION_CONTEXT,
+    "@type": EDUCATION_TYPE,
+    kind,
+    level,
+    durationMinutes,
+    concepts,
+  },
+});
+
+export const buildOffer = ({ id, resourceIds, name, currency = "INR", value = 0 }) => ({
+  id,
+  descriptor: { name },
+  resourceIds,
+  considerations: [
+    {
+      id: `${id}-price`,
+      considerationAttributes: {
+        "@context": "https://schema.org",
+        "@type": "PriceSpecification",
+        priceCurrency: currency,
+        price: String(value),
+      },
+    },
   ],
 });
+
+export const priceOf = (offer) => {
+  const attributes = offer?.considerations?.[0]?.considerationAttributes;
+  return { currency: attributes?.priceCurrency ?? "INR", value: Number(attributes?.price ?? 0) };
+};
 
 export const DEFAULT_PROVIDER = {
   id: "learning-assistant",
@@ -35,8 +63,8 @@ export const DEFAULT_PROVIDER = {
   },
 };
 
-export const DEFAULT_ITEMS = [
-  buildItem({
+export const DEFAULT_RESOURCES = [
+  buildResource({
     id: "deck-graphs-101",
     name: "Graph algorithms — flashcard deck",
     shortDesc: "48 cards on traversal, shortest paths and spanning trees, scheduled with FSRS",
@@ -44,7 +72,7 @@ export const DEFAULT_ITEMS = [
     concepts: ["graphs", "dijkstra", "bfs", "dfs", "mst"],
     durationMinutes: 25,
   }),
-  buildItem({
+  buildResource({
     id: "quiz-shortest-paths",
     name: "Shortest paths — practice quiz",
     shortDesc: "20 graded multiple-choice questions on Dijkstra, Bellman-Ford and A*",
@@ -53,7 +81,7 @@ export const DEFAULT_ITEMS = [
     level: "intermediate",
     durationMinutes: 30,
   }),
-  buildItem({
+  buildResource({
     id: "course-dp-foundations",
     name: "Dynamic programming foundations",
     shortDesc: "A six-part micro-course from memoisation to tabulation, with worked examples",
@@ -61,43 +89,94 @@ export const DEFAULT_ITEMS = [
     concepts: ["dynamic-programming", "memoisation", "recursion"],
     level: "intermediate",
     durationMinutes: 180,
-    price: 499,
   }),
-  buildItem({
+  buildResource({
     id: "course-linear-algebra",
     name: "Linear algebra for machine learning",
     shortDesc: "Vectors, matrices and eigendecomposition, aimed at ML practitioners",
     kind: "course",
     concepts: ["linear-algebra", "eigenvectors", "matrices"],
     durationMinutes: 240,
-    price: 799,
   }),
 ];
 
-const conceptsOf = (item) =>
-  item.tags.filter((t) => t.descriptor.code === "concept").map((t) => t.value.toLowerCase());
+export const DEFAULT_OFFERS = [
+  buildOffer({ id: "offer-deck-graphs-101", resourceIds: ["deck-graphs-101"], name: "Free deck", value: 0 }),
+  buildOffer({ id: "offer-quiz-shortest-paths", resourceIds: ["quiz-shortest-paths"], name: "Free quiz", value: 0 }),
+  buildOffer({ id: "offer-course-dp-foundations", resourceIds: ["course-dp-foundations"], name: "Course enrolment", value: 499 }),
+  buildOffer({ id: "offer-course-linear-algebra", resourceIds: ["course-linear-algebra"], name: "Course enrolment", value: 799 }),
+];
 
-/**
- * Matches a discovery intent against the catalog.
- *
- * A concept tag is an exact match — the consumer node got it from a mastery
- * model, not from a person typing, so fuzzy matching would only add noise.
- * Free text falls back to a substring match over the descriptor.
- */
-export const matchItems = (items, intent = {}) => {
-  const concepts = (intent.tags || [])
-    .filter((t) => t.descriptor?.code === "concept")
-    .map((t) => String(t.value).toLowerCase());
-  const text = intent.item?.descriptor?.name?.toLowerCase().trim();
+// --- discovery ------------------------------------------------------------
 
-  if (!concepts.length && !text) return items;
+// v2 replaced v1's tag-matching with two intent fields: `textSearch` for free
+// text, and `filters.expression`, a JSONPath over the resource.
+//
+// A complete JSONPath engine is well beyond what this needs, so a deliberately
+// small subset is evaluated: equality and membership against a dotted path,
+//
+//   $[?(@.resourceAttributes.level == 'intermediate')]
+//   $[?('dijkstra' in @.resourceAttributes.concepts)]
+//
+// which covers every query the consumer node actually sends. Anything else is
+// reported as unsupported rather than silently matching nothing — a filter
+// that quietly returns an empty catalog is far worse to debug than one that
+// says it was not understood.
+const EQUALITY = /^\$\[\?\(@\.([\w.]+)\s*==\s*'([^']*)'\)\]$/;
+const MEMBERSHIP = /^\$\[\?\('([^']*)'\s+in\s+@\.([\w.]+)\)\]$/;
 
-  return items.filter((item) => {
-    if (concepts.length && concepts.some((concept) => conceptsOf(item).includes(concept))) return true;
-    if (text) {
-      const haystack = `${item.descriptor.name} ${item.descriptor.shortDesc}`.toLowerCase();
-      return haystack.includes(text);
-    }
-    return false;
-  });
+const valueAt = (object, path) => path.split(".").reduce((node, key) => node?.[key], object);
+
+export class UnsupportedFilterError extends Error {
+  constructor(expression) {
+    super(`unsupported filter expression: ${expression}`);
+    this.name = "UnsupportedFilterError";
+  }
+}
+
+export const matchesFilter = (resource, expression) => {
+  const equality = expression.match(EQUALITY);
+  if (equality) return String(valueAt(resource, equality[1])) === equality[2];
+
+  const membership = expression.match(MEMBERSHIP);
+  if (membership) {
+    const collection = valueAt(resource, membership[2]);
+    return Array.isArray(collection) && collection.includes(membership[1]);
+  }
+  throw new UnsupportedFilterError(expression);
+};
+
+export const matchResources = (resources, intent = {}) => {
+  let matched = resources;
+
+  if (intent.filters?.expression) {
+    matched = matched.filter((resource) => matchesFilter(resource, intent.filters.expression));
+  }
+
+  if (intent.textSearch) {
+    const needle = intent.textSearch.toLowerCase().trim();
+    matched = matched.filter((resource) => {
+      const haystack = `${resource.descriptor.name} ${resource.descriptor.shortDesc} ${resource.resourceAttributes.concepts.join(" ")}`;
+      return haystack.toLowerCase().includes(needle);
+    });
+  }
+  return matched;
+};
+
+/** A JSONPath filter selecting every resource that teaches `concept`. */
+export const conceptFilter = (concept) => ({
+  type: "jsonpath",
+  expression: `$[?('${concept}' in @.resourceAttributes.concepts)]`,
+});
+
+/** Builds a spec-valid Catalog from whatever resources matched. */
+export const buildCatalog = ({ id, provider, resources, offers }) => {
+  const resourceIds = new Set(resources.map((resource) => resource.id));
+  return {
+    id,
+    descriptor: provider.descriptor,
+    provider,
+    resources,
+    offers: offers.filter((offer) => offer.resourceIds.some((rid) => resourceIds.has(rid))),
+  };
 };

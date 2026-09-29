@@ -52,6 +52,12 @@ seconds to wake it back up. After that it's fast.
   finished quiz as Markdown.
 - **Dashboard**: See your document, flashcard and quiz counts, plus recent
   activity.
+- **Open network (Beckn v2.0)**: The app runs a consumer node that searches
+  other providers for material on whatever concept you're weak on, and a
+  provider node that publishes its own generated decks, quizzes and courses
+  for other applications to discover. Every request is ed25519-signed and
+  verified against a registry lookup. See
+  [docs/beckn.md](docs/beckn.md).
 
 ## Tech stack
 
@@ -88,6 +94,7 @@ backend/
 │                     ReviewLog, Mastery, LlmCall, RefreshToken, and the token/cache models
 ├── routes/           one router per resource, mounted under /api/*
 ├── utils/            generateToken, aiClient, prompts, getOwnedDocument, fsrs, sm2, bkt
+├── beckn/            core/ (signing, context, ack), registry/, bap/, bpp/, network.js, demo.js
 ├── uploads/           (gitignored) stored PDFs
 └── server.js
 
@@ -165,6 +172,8 @@ Then open `http://localhost:5173`. Register an account and upload a PDF.
 | `frontend/ai-learning-assistant/` | `npm run build` | Production build to `dist/` |
 | `frontend/ai-learning-assistant/` | `npm run lint` | Run ESLint |
 | `backend/` | `npm run compare-schedulers` | Regenerate `docs/scheduler-comparison.md` (SM-2 vs. FSRS) |
+| `backend/` | `npm run beckn:demo` | Start a local Beckn network and walk discover → confirm |
+| `backend/` | `npm run beckn:conform` | The Beckn protocol conformance suite |
 
 ## Spaced repetition: SM-2 vs. FSRS
 
@@ -184,6 +193,37 @@ session at `/review`.
 numbers from a synthetic-learner simulation. The app has no real review
 history to replay yet, so read the file for what the simulation does and
 doesn't prove. Regenerate it with `npm run compare-schedulers`.
+
+## Open network: Beckn Protocol v2.0
+
+The app is a network participant, on both sides.
+
+As a **consumer node** it takes the weak concepts the dashboard already ranks
+and searches an open network for anything that teaches them — so the answer to
+"you keep missing shortest-path questions" is no longer limited to material
+generated from documents you already uploaded. As a **provider node** it
+publishes its own generated decks, quizzes and micro-courses, tagged by
+concept, for other applications to find.
+
+```bash
+cd backend
+npm run beckn:demo      # start a whole network and walk discover -> confirm
+npm run beckn:conform   # the protocol conformance suite
+```
+
+`npm run beckn:demo` starts a registry, a consumer node and two provider nodes
+on loopback, then narrates a real journey across them: a learner weak on
+`dijkstra`, a fan-out search answered by both providers, and a
+`select → init → confirm → status` enrolment. Every request is ed25519-signed
+and verified against a registry lookup.
+
+This targets the **v2.0.0 LTS** line, not v1.x — named endpoints per action,
+`senderId`/`receiverId` instead of `bapId`/`bppId`, consumer/provider node
+naming, and DeDi-style registry records.
+[docs/beckn.md](docs/beckn.md) covers the architecture, the asynchronous
+ACK-then-callback shape, the signing details that are easy to get wrong, how
+the education domain is mapped, what is deliberately left out of the MVP, and
+the steps to move from the local registry to the live NFH fabric.
 
 ## Deployment
 
@@ -302,10 +342,11 @@ Netlify for example, or with `docker-compose.yml` below, and point
 
 | Command | What it covers |
 |---|---|
-| `cd backend && npm test` | 500+ unit and integration tests against an in-memory MongoDB |
+| `cd backend && npm test` | 530+ unit and integration tests against an in-memory MongoDB |
 | `cd frontend/ai-learning-assistant && npm test` | 160+ component and unit tests |
 | `cd e2e && npm test` | Playwright smoke tests (register, upload) |
 | `cd e2e && npm run test:full` | The whole product: an API journey and two real-browser journeys (dev server and the production build under its CSP), against a fake OpenAI server |
+| `cd backend && npm run beckn:conform` | Beckn protocol conformance: signatures, tampering, expiry, malformed contexts and replayed messageIds |
 | `cd e2e && npm run eval:check` | RAG evals: retrieval, citation and answer scores over a 100-question gold set, failing on a regression. See [e2e/evals/README.md](e2e/evals/README.md) for what it does and doesn't show |
 
 ## Notes

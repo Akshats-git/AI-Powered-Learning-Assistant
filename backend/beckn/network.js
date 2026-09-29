@@ -12,8 +12,9 @@ import { createRegistryClient } from "./registry/client.js";
 import { createBapApp } from "./bap/app.js";
 import { createTransactionStore } from "./bap/transactions.js";
 import { createBppApp } from "./bpp/app.js";
+import { createGatewayApp } from "./gateway/app.js";
 import { generateKeyPair } from "./core/keys.js";
-import { CONSUMER_NODE, PROVIDER_NODE } from "./registry/store.js";
+import { CONSUMER_NODE, PROVIDER_NODE, GATEWAY } from "./registry/store.js";
 
 const listen = (app) =>
   new Promise((resolve) => {
@@ -31,6 +32,7 @@ const close = (server) => new Promise((resolve) => server.close(resolve));
 export const startNetwork = async ({
   providers = [{ subscriberId: "provider.learn.local" }],
   consumerSubscriberId = "app.learn.local",
+  withGateway = false,
   collectionWindowMs,
   logger = console,
   now = Date.now,
@@ -76,11 +78,33 @@ export const startNetwork = async ({
     providerNodes.push({ ...node, app, identity, subscriberId: descriptor.subscriberId });
   }
 
+  // Optional: with a gateway the consumer sends one /discover and the gateway
+  // multiplies it; without one the consumer fans out from the registry itself.
+  let gatewayNode = null;
+  if (withGateway) {
+    const gatewayIdentity = { subscriberId: "gateway.learn.local", keyId: "key-1" };
+    const gatewayApp = createGatewayApp({
+      identity: gatewayIdentity,
+      lookupKey: registry.lookupKey,
+      registry,
+      logger,
+      now,
+    });
+    const node = await listen(gatewayApp);
+    servers.push(node.server);
+    Object.assign(
+      gatewayIdentity,
+      await subscribe({ subscriberId: gatewayIdentity.subscriberId, url: node.url, type: GATEWAY })
+    );
+    gatewayNode = { ...node, identity: gatewayIdentity, subscriberId: gatewayIdentity.subscriberId };
+  }
+
   const consumerIdentity = { subscriberId: consumerSubscriberId, keyId: "key-1" };
   const bapApp = createBapApp({
     identity: consumerIdentity,
     lookupKey: registry.lookupKey,
     registry,
+    gateway: gatewayNode ? { subscriberId: gatewayNode.subscriberId, url: gatewayNode.url } : undefined,
     transactions: createTransactionStore({ collectionWindowMs, now }),
     logger,
     now,
@@ -95,6 +119,7 @@ export const startNetwork = async ({
   return {
     registry: { ...registryNode, client: registry },
     consumer: { ...consumerNode, app: bapApp, identity: consumerIdentity },
+    gateway: gatewayNode,
     providers: providerNodes,
     stop: () => Promise.all(servers.map(close)),
   };

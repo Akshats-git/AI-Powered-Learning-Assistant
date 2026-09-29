@@ -52,6 +52,8 @@ export const createBppApp = ({
   provider = DEFAULT_PROVIDER,
   contracts = new Map(),
   seenMessageIds = new Set(),
+  callbackRetries = 2,
+  callbackRetryDelayMs = 200,
   logger = console,
   fetchImpl = fetch,
   now = Date.now,
@@ -91,6 +93,13 @@ export const createBppApp = ({
       offer: { id: offer.id, resourceIds: offer.resourceIds },
     }));
 
+  // A dropped callback is worse than a slow one: the consumer waits out its
+  // window and shows the learner nothing, with no way to tell "no results"
+  // apart from "the answer got lost". So delivery is retried with backoff
+  // beyond the transport-level retries inside postSigned.
+  //
+  // Still bounded and in memory — a process restart loses whatever is in
+  // flight. A durable queue is the real answer and is noted in docs/beckn.md.
   const deliver = async (context, message) => {
     const reply = replyContext(context, { now });
     const url = callbackUrlFor(context);
@@ -99,10 +108,22 @@ export const createBppApp = ({
     const { valid, errors } = validateMessage(reply.action, message);
     if (!valid) return logger.error?.(`beckn pn: refusing to send invalid ${reply.action} — ${errors}`);
 
-    try {
-      await postSigned({ url: `${url}/${reply.action}`, payload: { context: reply, message }, identity, fetchImpl, now });
-    } catch (err) {
-      logger.warn?.(`beckn pn: callback ${reply.action} to ${url} failed — ${err.message}`);
+    for (let attempt = 0; attempt <= callbackRetries; attempt += 1) {
+      try {
+        await postSigned({
+          url: `${url}/${reply.action}`,
+          payload: { context: reply, message },
+          identity,
+          fetchImpl,
+          now,
+        });
+        return;
+      } catch (err) {
+        if (attempt === callbackRetries) {
+          return logger.warn?.(`beckn pn: callback ${reply.action} to ${url} failed after ${attempt + 1} attempts — ${err.message}`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, callbackRetryDelayMs * 2 ** attempt));
+      }
     }
   };
 

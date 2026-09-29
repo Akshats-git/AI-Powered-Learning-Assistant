@@ -46,6 +46,20 @@ export const createRegistryApp = ({ store = createSubscriberStore() } = {}) => {
     res.json(record);
   });
 
+  // Rotation: publish the new key first (a plain subscribe under a new keyId),
+  // let peers' lookup caches pick it up, then revoke the old one. Revoking
+  // first would break every in-flight message signed with it.
+  app.post("/registry/revoke", (req, res) => {
+    const { subscriberId, keyId } = req.body || {};
+    if (!subscriberId || !keyId) return res.status(400).json({ error: "subscriberId and keyId are required" });
+    if (!store.revoke(subscriberId, keyId)) return res.status(404).json({ error: "subscriber record not found" });
+    res.json({ subscriberId, keyId, status: "REVOKED" });
+  });
+
+  app.get("/registry/keys/:subscriberId", (req, res) => {
+    res.json({ keys: store.keysFor(req.params.subscriberId) });
+  });
+
   app.get("/registry/subscribers", (req, res) => {
     const filter = {};
     if (req.query.type) filter.type = req.query.type;

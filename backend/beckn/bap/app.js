@@ -25,6 +25,7 @@ export const createBapApp = ({
   identity,
   lookupKey,
   registry,
+  gateway,
   networkId = "beckn.local",
   transactions = createTransactionStore(),
   logger = console,
@@ -87,12 +88,34 @@ export const createBapApp = ({
 
   const providerNodes = () => registry.subscribers({ type: "PN" });
 
-  /** Fans a discovery intent out to every provider node on the subnet. */
+  /**
+   * Discovery, by whichever topology is configured.
+   *
+   * With a gateway: one /discover goes to it and it multiplies the request
+   * across the subnet. Every provider answers the *same* messageId, so the
+   * callbacks all land against one pending entry and the collection window is
+   * what decides when to stop waiting.
+   *
+   * Without one: the consumer reads the registry and fans out itself, opening
+   * a pending entry per provider. Slower to add providers to, but it works
+   * with no gateway on the subnet, which is why both paths exist.
+   */
   const discover = async (intent) => {
-    const providers = await providerNodes();
-    if (!providers.length) return { transactionId: null, catalogs: [] };
-
     const transactionId = newTransactionId();
+
+    if (gateway) {
+      const collected = await send({
+        action: "discover",
+        message: { intent },
+        provider: { subscriberId: gateway.subscriberId, url: gateway.url },
+        transactionId,
+      });
+      return { transactionId, catalogs: (await collected).flatMap((cb) => cb.message?.catalogs || []) };
+    }
+
+    const providers = await providerNodes();
+    if (!providers.length) return { transactionId, catalogs: [] };
+
     const settled = await Promise.allSettled(
       providers.map((provider) =>
         send({

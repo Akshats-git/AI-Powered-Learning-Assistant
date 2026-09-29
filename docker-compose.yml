@@ -1,5 +1,6 @@
-# `docker compose up --build` runs the whole app: Mongo, the API, and the
-# built frontend served by nginx. No Redis/worker service — this app has no
+# `docker compose up --build` runs the whole app: Mongo, the API, the built
+# frontend served by nginx, and a complete Beckn subnet (registry, gateway and
+# two provider nodes) for the Network page to search. No Redis/worker service — this app has no
 # async job queue yet (BullMQ + a separate worker process is Phase 26 on the
 # roadmap); everything here reflects what's actually implemented today.
 #
@@ -40,11 +41,75 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       MONTHLY_AI_BUDGET_USD: ${MONTHLY_AI_BUDGET_USD:-}
+      # The API is the subnet's consumer node. These make the Network page
+      # live against the registry, gateway and provider nodes below; drop
+      # them and the page reports itself unconfigured, everything else works.
+      BECKN_SUBSCRIBER_ID: app.learn.local
+      BECKN_PRIVATE_KEY: ${BECKN_PRIVATE_KEY:-}
+      BECKN_CALLBACK_URL: http://api:8000/beckn
+      BECKN_REGISTRY_URL: http://beckn-registry:9000
+      BECKN_GATEWAY_ID: gateway.learn.local
+      BECKN_GATEWAY_URL: http://beckn-gateway:9001
     volumes:
       # Uploaded PDFs survive a `docker compose restart`, unlike the
       # "wiped on every deploy" problem the README flags for Render/Railway —
       # this is still local disk, not S3/R2 (Phase 26), just a persistent one.
       - uploads-data:/app/uploads
+
+  # --- Beckn subnet ------------------------------------------------------
+  # A registry, a broadcast gateway and two provider nodes, each its own
+  # process, all from the backend image. `node beckn/serve.js <role>` picks
+  # which one a container runs. Together with the API (the consumer node)
+  # this is a complete, self-contained Beckn network on one host.
+
+  beckn-registry:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: node beckn/serve.js registry
+    environment:
+      PORT: 9000
+    ports:
+      - "9000:9000"
+
+  beckn-gateway:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      - beckn-registry
+    command: node beckn/serve.js gateway
+    environment:
+      PORT: 9001
+      BECKN_SUBSCRIBER_ID: gateway.learn.local
+      BECKN_PUBLIC_URL: http://beckn-gateway:9001
+      BECKN_REGISTRY_URL: http://beckn-registry:9000
+
+  beckn-provider-a:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      - beckn-registry
+    command: node beckn/serve.js provider
+    environment:
+      PORT: 9002
+      BECKN_SUBSCRIBER_ID: provider-a.learn.local
+      BECKN_PUBLIC_URL: http://beckn-provider-a:9002
+      BECKN_REGISTRY_URL: http://beckn-registry:9000
+
+  beckn-provider-b:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      - beckn-registry
+    command: node beckn/serve.js provider
+    environment:
+      PORT: 9003
+      BECKN_SUBSCRIBER_ID: provider-b.learn.local
+      BECKN_PUBLIC_URL: http://beckn-provider-b:9003
+      BECKN_REGISTRY_URL: http://beckn-registry:9000
 
   web:
     build:

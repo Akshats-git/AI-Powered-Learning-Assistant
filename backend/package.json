@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "compare-schedulers": "node scripts/compareSchedulers.js",
     "beckn:demo": "node beckn/demo.js",
-    "beckn:conform": "vitest run tests/becknConformance.test.js tests/becknSigning.test.js"
+    "beckn:conform": "vitest run tests/becknConformance.test.js tests/becknSigning.test.js",
+    "beckn:serve": "node beckn/serve.js"
   },
   "keywords": [],
   "author": "",

@@ -24,6 +24,7 @@ const ReviewSessionPage = lazy(() => import("./pages/Review/ReviewSessionPage"))
 const QuizzesListPage = lazy(() => import("./pages/Quizzes/QuizzesListPage"));
 const QuizTakePage = lazy(() => import("./pages/Quizzes/QuizTakePage"));
 const QuizResultPage = lazy(() => import("./pages/Quizzes/QuizResultPage"));
+const NetworkPage = lazy(() => import("./pages/Network/NetworkPage"));
 const ProfilePage = lazy(() => import("./pages/Profile/ProfilePage"));
 const AdminCostDashboardPage = lazy(() => import("./pages/Admin/AdminCostDashboardPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
@@ -112,6 +113,7 @@ const AppRoutes = () => (
       <Route path="/quizzes" element={<QuizzesListPage />} />
       <Route path="/quizzes/:id" element={<QuizTakePage />} />
       <Route path="/quizzes/:id/results" element={<QuizResultPage />} />
+      <Route path="/network" element={<NetworkPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/admin/costs" element={<AdminCostDashboardPage />} />
     </Route>

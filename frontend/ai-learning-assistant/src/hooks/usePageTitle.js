@@ -24,6 +24,7 @@ export const ROUTE_TITLES = [
   [/^\/quizzes$/, "Quizzes"],
   [/^\/quizzes\/[^/]+\/results$/, "Quiz results"],
   [/^\/quizzes\/[^/]+$/, "Quiz"],
+  [/^\/network$/, "Open network"],
   [/^\/profile$/, "Profile"],
   [/^\/admin\/costs$/, "Cost dashboard"],
 ];

@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, LayoutDashboard, FileText, Flame, Layers, HelpCircle, User, MessageSquare } from "lucide-react";
+import { Search, LayoutDashboard, FileText, Flame, Layers, HelpCircle, User, MessageSquare, Globe } from "lucide-react";
 
 import { searchAll } from "../../services/searchService";
 import { fuzzyFilter } from "../../utils/fuzzy";
@@ -11,6 +11,7 @@ const COMMANDS = [
   { id: "cmd-review", label: "Start a review session", to: "/review", icon: Flame },
   { id: "cmd-flashcards", label: "Go to Flashcards", to: "/flashcards", icon: Layers },
   { id: "cmd-quizzes", label: "Go to Quizzes", to: "/quizzes", icon: HelpCircle },
+  { id: "cmd-network", label: "Search the open network", to: "/network", icon: Globe },
   { id: "cmd-profile", label: "Go to Profile", to: "/profile", icon: User },
 ];
 

@@ -15,6 +15,15 @@ export const API_PATHS = {
     REVOKE_SESSION: (familyId) => `/api/auth/sessions/${familyId}`,
     API_KEY: "/api/auth/api-key",
   },
+  NETWORK: {
+    STATUS: "/api/network/status",
+    SUGGESTIONS: "/api/network/suggestions",
+    DISCOVER: "/api/network/discover",
+    SELECT: "/api/network/select",
+    INIT: "/api/network/init",
+    CONFIRM: "/api/network/confirm",
+    CONTRACT_STATUS: "/api/network/status",
+  },
   DOCUMENTS: {
     UPLOAD: "/api/documents/upload",
     LIST: "/api/documents",

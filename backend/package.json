@@ -11,7 +11,9 @@
     "dev": "nodemon server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "compare-schedulers": "node scripts/compareSchedulers.js"
+    "compare-schedulers": "node scripts/compareSchedulers.js",
+    "beckn:demo": "node beckn/demo.js",
+    "beckn:conform": "vitest run tests/becknConformance.test.js tests/becknSigning.test.js"
   },
   "keywords": [],
   "author": "",

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { GraduationCap, LayoutDashboard, FileText, Layers, HelpCircle, User, ShieldCheck, LogOut, X, Flame, Globe } from "lucide-react";
+import { GraduationCap, LayoutDashboard, FileText, Layers, HelpCircle, User, ShieldCheck, LogOut, X, Flame } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 
 const NAV_ITEMS = [
@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { to: "/review", label: "Review", icon: Flame },
   { to: "/flashcards", label: "Flashcards", icon: Layers },
   { to: "/quizzes", label: "Quizzes", icon: HelpCircle },
-  { to: "/network", label: "Open network", icon: Globe },
   { to: "/profile", label: "Profile", icon: User },
 ];
 

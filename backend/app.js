@@ -22,7 +22,6 @@ import adminRoutes from "./routes/adminRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import masteryRoutes from "./routes/masteryRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
-import networkRoutes from "./routes/networkRoutes.js";
 
 const app = express();
 
@@ -112,7 +111,6 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/review", reviewRoutes);
 app.use("/api/mastery", masteryRoutes);
 app.use("/api/search", searchRoutes);
-app.use("/api/network", networkRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

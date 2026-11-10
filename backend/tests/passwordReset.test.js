@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import app from "../app.js";
 import User from "../models/User.js";
-import { createResetToken } from "../utils/passwordResetStore.js";
+import { createResetToken, consumeResetToken } from "../utils/passwordResetStore.js";
 
 const extractCookie = (res, name) => res.headers["set-cookie"]?.find((c) => c.startsWith(`${name}=`))?.split(";")[0];
 
@@ -47,6 +47,17 @@ describe("reset password", () => {
 
     const second = await request(app).post("/api/auth/reset-password").send({ token, newPassword: "new-password-2" });
     expect(second.status).toBe(400);
+  });
+
+  it("lets only one of several concurrent requests redeem a token", async () => {
+    const email = "reset-race@example.com";
+    await request(app).post("/api/auth/register").send({ username: "Uma", email, password: "correct-password" });
+    const user = await User.findOne({ email });
+
+    const token = await createResetToken(user._id);
+    const results = await Promise.all(Array.from({ length: 5 }, () => consumeResetToken(token)));
+
+    expect(results.filter(Boolean)).toHaveLength(1);
   });
 
   it("rejects a garbage token", async () => {

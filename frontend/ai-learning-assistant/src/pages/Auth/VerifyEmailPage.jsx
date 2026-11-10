@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
@@ -13,8 +13,14 @@ const VerifyEmailPage = () => {
 
   const [status, setStatus] = useState(token ? "verifying" : "missing");
 
+  // The token is single-use. React StrictMode runs effects twice in dev, and
+  // a second POST would hit an already-consumed token and flip a successful
+  // verification to "failed" — so submit each token exactly once.
+  const submittedToken = useRef(null);
+
   useEffect(() => {
-    if (!token) return;
+    if (!token || submittedToken.current === token) return;
+    submittedToken.current = token;
 
     authService
       .verifyEmail({ token })

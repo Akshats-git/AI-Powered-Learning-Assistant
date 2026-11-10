@@ -21,10 +21,12 @@ export const createVerificationToken = async (userId) => {
  * @returns the user id it was issued for, or `null` if it's invalid/used/expired.
  */
 export const consumeVerificationToken = async (token) => {
-  const record = await EmailVerificationToken.findOne({ tokenHash: hashToken(token) });
-  if (!record || record.usedAt || record.expiresAt < new Date()) return null;
-
-  record.usedAt = new Date();
-  await record.save();
-  return record.user;
+  // One atomic check-and-mark: with a separate find then save, two concurrent
+  // requests could both see the token as unused and both redeem it.
+  const now = new Date();
+  const record = await EmailVerificationToken.findOneAndUpdate(
+    { tokenHash: hashToken(token), usedAt: null, expiresAt: { $gt: now } },
+    { $set: { usedAt: now } }
+  );
+  return record ? record.user : null;
 };

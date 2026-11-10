@@ -14,6 +14,7 @@ import { isAdminEmail } from "../utils/adminEmails.js";
 import { createResetToken, consumeResetToken } from "../utils/passwordResetStore.js";
 import { createVerificationToken, consumeVerificationToken } from "../utils/emailVerificationStore.js";
 import { sendMail } from "../utils/mailer.js";
+import { logger } from "../utils/logger.js";
 import { issueCsrfToken, clearCsrfCookie, isCsrfTokenValid } from "../utils/csrf.js";
 import { encrypt } from "../utils/encryption.js";
 import { verifyOpenAiKey } from "../utils/verifyOpenAiKey.js";
@@ -71,7 +72,14 @@ export const register = async (req, res, next) => {
     }
 
     const user = await User.create({ username, email, password });
-    await sendVerificationEmail(user);
+    try {
+      await sendVerificationEmail(user);
+    } catch (err) {
+      // The account already exists, so a failure here must not turn into a
+      // 500 (a retry would then say "Email already in use"). The user can
+      // request another link via "resend verification email".
+      logger.error({ err, userId: user._id }, "Could not issue/send the verification email at registration");
+    }
 
     const { accessToken, csrfToken } = await issueTokens(req, res, user);
     await recordAudit(req, "register", { userId: user._id });

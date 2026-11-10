@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
@@ -44,5 +45,24 @@ describe("VerifyEmailPage", () => {
     render(<VerifyEmailPage />, { wrapper: MemoryRouter });
 
     expect(await screen.findByText(/verification failed/i)).toBeInTheDocument();
+  });
+
+  it("submits a single-use token only once under StrictMode's double effect", async () => {
+    searchParamsValue = "?token=abc123";
+    useAuth.mockReturnValue({ user: null, updateUser: vi.fn() });
+    authService.verifyEmail.mockClear();
+    authService.verifyEmail.mockResolvedValue({});
+    // Rendered directly rather than through RTL's `wrapper` option, which
+    // (empirically) does not trigger StrictMode's double effect.
+    render(
+      <StrictMode>
+        <MemoryRouter>
+          <VerifyEmailPage />
+        </MemoryRouter>
+      </StrictMode>
+    );
+
+    expect(await screen.findByText(/email verified/i)).toBeInTheDocument();
+    expect(authService.verifyEmail).toHaveBeenCalledTimes(1);
   });
 });

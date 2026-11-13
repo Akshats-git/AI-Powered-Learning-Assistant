@@ -92,7 +92,9 @@ try {
   console.log("[e2e] backend is up");
 
   console.log(`[e2e] starting frontend on ${FRONTEND_URL}...`);
-  spawnChild("npm", ["run", "dev", "--", "--port", String(FRONTEND_PORT), "--strictPort"], {
+  // --host pins Vite to the same IPv4 address we poll: on GitHub's runners a
+  // bare "localhost" resolves to ::1 only, so waitForHttp(127.0.0.1) never saw it.
+  spawnChild("npm", ["run", "dev", "--", "--port", String(FRONTEND_PORT), "--strictPort", "--host", "127.0.0.1"], {
     cwd: FRONTEND_DIR,
     env: {
       ...process.env,

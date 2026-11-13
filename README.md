@@ -269,7 +269,9 @@ Netlify for example, or with `docker-compose.yml` below, and point
   your deploy.
 - `docker-compose.yml` runs the whole stack (Mongo, the API, and the built
   frontend behind nginx) in one command for a self-hosted deploy. See the
-  file for which env vars it forwards.
+  file for which env vars it forwards. It refuses to start until `JWT_SECRET` and
+  `ENCRYPTION_KEY` are set in a `.env` next to it (`openssl rand -hex 32` makes a good one),
+  since it runs with `NODE_ENV=production`.
 
 ## Operating it
 

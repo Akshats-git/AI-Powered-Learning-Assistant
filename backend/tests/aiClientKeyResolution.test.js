@@ -44,7 +44,7 @@ describe("aiClient key resolution", () => {
   it("falls back to the shared env key when there's no request-scoped context", async () => {
     process.env.OPENAI_API_KEY = "sk-env-shared";
     await generate("hi");
-    expect(OpenAIMock).toHaveBeenCalledWith({ apiKey: "sk-env-shared" });
+    expect(OpenAIMock).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "sk-env-shared", timeout: 60000 }));
   });
 
   it("prefers the requesting user's own key over the shared fallback", async () => {
@@ -52,13 +52,13 @@ describe("aiClient key resolution", () => {
     await runWithApiKey({ apiKey: "sk-users-own", keySource: "own" }, async () => {
       await generate("hi");
     });
-    expect(OpenAIMock).toHaveBeenCalledWith({ apiKey: "sk-users-own" });
+    expect(OpenAIMock).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "sk-users-own", timeout: 60000 }));
   });
 
   it("uses the shared key inside a context where the user has none of their own", async () => {
     await runWithApiKey({ apiKey: "sk-env-shared", keySource: "shared" }, async () => {
       await generate("hi");
     });
-    expect(OpenAIMock).toHaveBeenCalledWith({ apiKey: "sk-env-shared" });
+    expect(OpenAIMock).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "sk-env-shared", timeout: 60000 }));
   });
 });

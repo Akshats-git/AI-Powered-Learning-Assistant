@@ -15,7 +15,9 @@ const getClient = () => {
     err.statusCode = 400;
     throw err;
   }
-  return new OpenAI({ apiKey });
+  // Without a timeout a hung provider holds the request (and the user's spinner) open for
+  // the SDK default of 10 minutes. The breaker only learns about failures that actually end.
+  return new OpenAI({ apiKey, timeout: Number(process.env.OPENAI_TIMEOUT_MS) || 60_000, maxRetries: 1 });
 };
 
 const stripJsonFences = (text) =>

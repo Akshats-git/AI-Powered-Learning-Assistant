@@ -13,7 +13,7 @@ const getClient = () => {
     err.statusCode = 400;
     throw err;
   }
-  return new OpenAI({ apiKey });
+  return new OpenAI({ apiKey, timeout: Number(process.env.OPENAI_TIMEOUT_MS) || 60_000, maxRetries: 1 });
 };
 
 export const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";

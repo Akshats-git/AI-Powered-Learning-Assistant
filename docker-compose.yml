@@ -3,7 +3,8 @@
 # async job queue yet (BullMQ + a separate worker process is Phase 26 on the
 # roadmap); everything here reflects what's actually implemented today.
 #
-# Set OPENAI_API_KEY in a .env file next to this one (or export it before
+# Set JWT_SECRET and ENCRYPTION_KEY (required — this runs with NODE_ENV=production, so a
+# guessable default would be a real hole) and optionally OPENAI_API_KEY in a .env file next to this one (or export it before
 # running) to exercise the AI features; everything else works without it.
 
 services:
@@ -31,8 +32,8 @@ services:
       PORT: 8000
       NODE_ENV: production
       MONGO_URI: mongodb://mongo:27017/ai-learning-assistant
-      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-only-change-me}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in a .env file next to docker-compose.yml (openssl rand -hex 32)}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in a .env file next to docker-compose.yml (openssl rand -hex 32)}
       CLIENT_URL: http://localhost:5173
       # Used as a shared fallback for any user who hasn't saved their own
       # OpenAI key on their Profile page — see backend/.env.example. Leave

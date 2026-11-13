@@ -6,5 +6,5 @@ import OpenAI from "openai";
 // Split into its own module so tests can mock it without hitting the real
 // OpenAI API — see tests/apiKey.test.js.
 export const verifyOpenAiKey = async (apiKey) => {
-  await new OpenAI({ apiKey }).models.list();
+  await new OpenAI({ apiKey, timeout: 15_000, maxRetries: 0 }).models.list();
 };

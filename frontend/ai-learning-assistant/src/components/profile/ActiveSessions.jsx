@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import moment from "moment";
 import toast from "react-hot-toast";
 import { Monitor, ShieldCheck, X } from "lucide-react";
+import { timeAgo } from "../../utils/helpers";
 
 import { useAuth } from "../../hooks/useAuth";
 import { listSessions, revokeSession } from "../../services/authService";
@@ -65,7 +65,7 @@ const ActiveSessions = () => {
                   {describeSession(session.userAgent)}
                   {session.ip && <span className="text-gray-400"> · {session.ip}</span>}
                 </p>
-                <p className="text-xs text-gray-400">Active {moment(session.lastActiveAt).fromNow()}</p>
+                <p className="text-xs text-gray-400">Active {timeAgo(session.lastActiveAt)}</p>
               </div>
               {session.isCurrent && (
                 <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 shrink-0">

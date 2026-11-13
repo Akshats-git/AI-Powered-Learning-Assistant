@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import moment from "moment";
 import { Layers } from "lucide-react";
+import { timeAgo } from "../../utils/helpers";
 
 import { listFlashcardSets } from "../../services/flashcardService";
 
@@ -82,7 +82,7 @@ const FlashcardsListPage = () => {
 
               <h3 className="text-sm font-semibold text-gray-900 truncate">{set.title}</h3>
               <p className="text-xs text-gray-400 mt-1 mb-3">
-                {set.totalCards} cards · {moment(set.createdAt).fromNow()}
+                {set.totalCards} cards · {timeAgo(set.createdAt)}
               </p>
 
               <div className="w-full h-1.5 rounded-full bg-gray-100 mb-4 overflow-hidden">

@@ -54,7 +54,6 @@ const RegisterPage = () => {
     <AuthLayout
       title="Create your account"
       subtitle="Start turning documents into study material"
-      footer={<p>By continuing, you agree to our Terms of Service and Privacy Policy.</p>}
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>

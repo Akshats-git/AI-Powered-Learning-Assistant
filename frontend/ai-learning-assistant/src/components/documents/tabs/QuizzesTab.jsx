@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import moment from "moment";
 import toast from "react-hot-toast";
 import { HelpCircle, Trash2 } from "lucide-react";
+import { timeAgo } from "../../../utils/helpers";
 
 import { listQuizzesForDocument, deleteQuiz } from "../../../services/quizService";
 import { generateQuiz } from "../../../services/aiService";
@@ -156,7 +156,7 @@ const QuizzesTab = ({ documentId }) => {
               </div>
               <h3 className="text-sm font-semibold text-gray-900 truncate">{quiz.title}</h3>
               <p className="text-xs text-gray-400 mt-1 mb-4">
-                {quiz.questions.length} questions · {moment(quiz.createdAt).fromNow()}
+                {quiz.questions.length} questions · {timeAgo(quiz.createdAt)}
               </p>
               <button
                 onClick={() =>

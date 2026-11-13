@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import moment from "moment";
 import { HelpCircle, CheckCircle2 } from "lucide-react";
+import { timeAgo } from "../../utils/helpers";
 
 import { listQuizzes } from "../../services/quizService";
 
@@ -92,7 +92,7 @@ const QuizzesListPage = () => {
                 <h3 className="text-sm font-semibold text-gray-900 truncate">{quiz.title}</h3>
                 <p className="text-xs text-gray-400 mt-1 truncate">{quiz.document?.title}</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  {quiz.questionCount} questions · {moment(quiz.createdAt).fromNow()}
+                  {quiz.questionCount} questions · {timeAgo(quiz.createdAt)}
                 </p>
               </button>
             ))}

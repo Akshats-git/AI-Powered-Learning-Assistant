@@ -64,9 +64,6 @@ const LoginPage = () => {
     <AuthLayout
       title="Welcome back"
       subtitle="Sign in to continue to your workspace"
-      footer={
-        <p>By continuing, you agree to our Terms of Service and Privacy Policy.</p>
-      }
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>

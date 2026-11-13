@@ -111,9 +111,10 @@ const FlashcardPage = () => {
         <p className="text-sm text-gray-500">No flashcard set found for this document.</p>
       ) : (
         <>
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 truncate">{set.title}</h1>
-            <div className="flex items-center gap-4 shrink-0">
+          {/* Stacked on phones: title and three actions on one row squeezed the title to "C..". */}
+          <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="min-w-0 text-2xl font-bold text-gray-900 sm:truncate">{set.title}</h1>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:shrink-0">
               {[["csv", "Export CSV"], ["anki", "Export for Anki"]].map(([format, label]) => (
                 <button
                   key={format}

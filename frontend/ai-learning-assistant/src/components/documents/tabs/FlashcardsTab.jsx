@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import moment from "moment";
 import toast from "react-hot-toast";
 import { Layers, Trash2 } from "lucide-react";
+import { timeAgo } from "../../../utils/helpers";
 
 import { listFlashcardSetsForDocument, deleteFlashcardSet } from "../../../services/flashcardService";
 import { generateFlashcards } from "../../../services/aiService";
@@ -121,7 +121,7 @@ const FlashcardsTab = ({ documentId }) => {
             </div>
             <h3 className="text-sm font-semibold text-gray-900 truncate">{set.title}</h3>
             <p className="text-xs text-gray-400 mt-1">
-              {set.totalCards} cards · {moment(set.createdAt).fromNow()}
+              {set.totalCards} cards · {timeAgo(set.createdAt)}
             </p>
           </div>
         ))}

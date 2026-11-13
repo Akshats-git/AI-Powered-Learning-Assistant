@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import moment from "moment";
 import { FileText, Layers, HelpCircle, ArrowRight, Inbox } from "lucide-react";
+import { timeAgo } from "../../utils/helpers";
 
 import { getOverview } from "../../services/dashboardService";
 import { useAuth } from "../../hooks/useAuth";
@@ -109,7 +109,7 @@ const DashboardPage = () => {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-800 truncate">{activity.label}</p>
-                      <p className="text-xs text-gray-400">{moment(activity.timestamp).fromNow()}</p>
+                      <p className="text-xs text-gray-400">{timeAgo(activity.timestamp)}</p>
                     </div>
                   </div>
                   <Link to={activity.link} className="text-xs font-medium text-primary hover:underline shrink-0 ml-3">

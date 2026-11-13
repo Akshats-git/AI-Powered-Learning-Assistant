@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import moment from "moment";
 import { FileText, Layers, HelpCircle, AlertTriangle, Info } from "lucide-react";
-import { formatFileSize } from "../../utils/helpers";
+import { formatFileSize, timeAgo } from "../../utils/helpers";
 
 const DocumentCard = ({ document }) => {
   const navigate = useNavigate();
@@ -17,7 +16,7 @@ const DocumentCard = ({ document }) => {
 
       <h3 className="text-sm font-semibold text-gray-900 truncate">{document.title}</h3>
       <p className="text-xs text-gray-400 mt-1">
-        {formatFileSize(document.fileSize)} · {moment(document.createdAt).fromNow()}
+        {formatFileSize(document.fileSize)} · {timeAgo(document.createdAt)}
       </p>
 
       <div className="flex items-center gap-2 mt-3">

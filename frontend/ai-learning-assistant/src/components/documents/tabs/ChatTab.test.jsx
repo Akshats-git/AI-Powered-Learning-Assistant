@@ -2,11 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ChatTab from "./ChatTab";
-import { getChatHistory, streamChatMessage } from "../../../services/aiService";
+import { clearChatHistory, getChatHistory, streamChatMessage } from "../../../services/aiService";
 
 vi.mock("../../../services/aiService", () => ({
   getChatHistory: vi.fn(),
   streamChatMessage: vi.fn(),
+  clearChatHistory: vi.fn(),
 }));
 
 // jsdom doesn't implement scrollIntoView — ChatTab calls it on every message
@@ -24,6 +25,7 @@ describe("ChatTab", () => {
   beforeEach(() => {
     getChatHistory.mockReset();
     streamChatMessage.mockReset();
+    clearChatHistory.mockReset();
   });
 
   it("shows a sources toggle under a retrieval-grounded assistant reply, and not under the user's own message", async () => {
@@ -113,5 +115,27 @@ describe("ChatTab", () => {
     getChatHistory.mockResolvedValue({ data: [] });
     render(<ChatTab documentId="doc-1" />);
     expect(await screen.findByRole("log", { name: "Conversation" })).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("clears the conversation after confirming, and not before", async () => {
+    getChatHistory.mockResolvedValue({ data: [{ role: "user", content: "How is ATP produced?" }, ASSISTANT_WITH_SOURCES] });
+    clearChatHistory.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<ChatTab documentId="doc-1" />);
+
+    await user.click(await screen.findByRole("button", { name: /clear chat/i }));
+    expect(clearChatHistory).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(clearChatHistory).toHaveBeenCalledWith("doc-1");
+    expect(await screen.findByText(/ask a question about this document to get started/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /clear chat/i })).not.toBeInTheDocument();
+  });
+
+  it("offers no Clear button on an empty conversation", async () => {
+    getChatHistory.mockResolvedValue({ data: [] });
+    render(<ChatTab documentId="doc-1" />);
+    await screen.findByText(/get started/i);
+    expect(screen.queryByRole("button", { name: /clear chat/i })).not.toBeInTheDocument();
   });
 });

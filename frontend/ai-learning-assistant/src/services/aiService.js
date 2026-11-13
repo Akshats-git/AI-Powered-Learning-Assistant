@@ -29,6 +29,8 @@ export const sendChatMessage = (documentId, message) =>
 
 export const getChatHistory = (documentId) => axiosInstance.get(API_PATHS.AI.CHAT_HISTORY(documentId));
 
+export const clearChatHistory = (documentId) => axiosInstance.delete(API_PATHS.AI.CHAT_HISTORY(documentId));
+
 const errorFrom = async (res) => {
   let envelope;
   try {

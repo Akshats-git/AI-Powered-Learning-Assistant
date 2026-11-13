@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Square } from "lucide-react";
+import { Eraser, Send, Square } from "lucide-react";
 import toast from "react-hot-toast";
 
-import { getChatHistory, streamChatMessage } from "../../../services/aiService";
+import { clearChatHistory, getChatHistory, streamChatMessage } from "../../../services/aiService";
 import MarkdownRenderer from "../../ui/MarkdownRenderer";
 import ChatSources from "./ChatSources";
+import ConfirmDeleteModal from "../../ui/ConfirmDeleteModal";
 
 const ChatTab = ({ documentId, onOpenPage }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const bottomRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -62,8 +65,33 @@ const ChatTab = ({ documentId, onOpenPage }) => {
     }
   };
 
+  const handleClear = async () => {
+    setClearing(true);
+    try {
+      await clearChatHistory(documentId);
+      setMessages([]);
+      setConfirmingClear(false);
+      toast.success("Chat cleared");
+    } catch {
+      // axiosInstance already toasts the error
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 flex flex-col h-[75vh]">
+      {messages.length > 0 && !sending && (
+        <div className="flex justify-end px-3 pt-2">
+          <button
+            type="button"
+            onClick={() => setConfirmingClear(true)}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+          >
+            <Eraser className="w-3.5 h-3.5" /> Clear chat
+          </button>
+        </div>
+      )}
       {/* role=log + aria-live: a screen reader announces the answer as it streams in. */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4" role="log" aria-live="polite" aria-label="Conversation">
         {loading ? (
@@ -132,6 +160,16 @@ const ChatTab = ({ documentId, onOpenPage }) => {
           <Send className="w-4 h-4" />
         </button>
       </form>
+
+      {confirmingClear && (
+        <ConfirmDeleteModal
+          title="Clear this conversation?"
+          description="All messages for this document will be deleted. This can't be undone."
+          deleting={clearing}
+          onCancel={() => setConfirmingClear(false)}
+          onConfirm={handleClear}
+        />
+      )}
     </div>
   );
 };

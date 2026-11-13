@@ -7,6 +7,7 @@ import {
   chatWithDocument,
   chatStream,
   getChatHistory,
+  clearChatHistory,
 } from "../controllers/aiController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { attachAiKeyContext } from "../middlewares/aiKeyContext.js";
@@ -25,6 +26,12 @@ import {
 const router = express.Router();
 
 router.use(protect);
+
+// Reading or clearing a conversation costs nothing, so it sits ahead of the AI rate
+// limiter: opening a document must not eat into the 30-requests-per-15-minutes budget.
+router.get("/chat-history/:documentId", validate(chatHistoryParamsSchema), getChatHistory);
+router.delete("/chat-history/:documentId", validate(chatHistoryParamsSchema), clearChatHistory);
+
 router.use(aiRateLimiter);
 router.use(attachAiKeyContext);
 
@@ -34,6 +41,5 @@ router.post("/summary", validate(summarySchema), generateSummary);
 router.post("/explain", validate(explainSchema), explainConcept);
 router.post("/chat", validate(chatSchema), idempotent, chatWithDocument);
 router.post("/chat/stream", validate(chatSchema), chatStream);
-router.get("/chat-history/:documentId", validate(chatHistoryParamsSchema), getChatHistory);
 
 export default router;

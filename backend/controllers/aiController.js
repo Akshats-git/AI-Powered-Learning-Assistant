@@ -31,6 +31,7 @@ import { rewriteQuery } from "../utils/queryRewrite.js";
 import { getCachedChatReply, cacheChatReply, getCachedSummary, cacheSummary } from "../utils/semanticCache.js";
 import { hashChunkText } from "../utils/embeddings.js";
 import { hasActiveApiKey } from "../utils/aiContext.js";
+import { sanitizeFlashcards, sanitizeQuestions } from "../utils/generationOutput.js";
 import { logger } from "../utils/logger.js";
 
 // Wider than the final answer set (DEFAULT_RESULT_LIMIT) on purpose — RRF
@@ -39,6 +40,9 @@ import { logger } from "../utils/logger.js";
 const RERANK_CANDIDATE_POOL = 20;
 
 const CHAT_CONTEXT_SIZE = 10;
+// One ChatHistory document holds a whole conversation, so it needs a ceiling or it
+// creeps toward Mongo's 16MB document limit. The oldest messages fall off first.
+const MAX_STORED_MESSAGES = 200;
 const DIFFICULTIES = ["easy", "medium", "hard"];
 
 const clampCount = (value, fallback, max) => (Number.isFinite(value) ? Math.min(value, max) : fallback);
@@ -132,11 +136,7 @@ export const generateFlashcards = async (req, res, next) => {
         throw err;
       }
 
-      const cards = result.flashcards.map((c) => ({
-        question: c.question,
-        answer: c.answer,
-        difficulty: DIFFICULTIES.includes(c.difficulty) ? c.difficulty : "medium",
-      }));
+      const cards = sanitizeFlashcards(result.flashcards, DIFFICULTIES);
 
       return Flashcard.create({
         user: req.user._id,
@@ -187,15 +187,7 @@ export const generateQuiz = async (req, res, next) => {
         throw err;
       }
 
-      const questions = result.questions.map((q) => ({
-        question: q.question,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-        explanation: q.explanation || "",
-        // A concept quiz is *about* one concept: don't trust the model to echo it
-        // back verbatim, or a paraphrase would fork the learner's mastery record.
-        concept: concept || (typeof q.concept === "string" && q.concept.trim() ? q.concept.trim() : null),
-      }));
+      const questions = sanitizeQuestions(result.questions, { concept });
 
       return Quiz.create({
         user: req.user._id,
@@ -419,6 +411,7 @@ const runChat = async (req, { onSources = () => {}, generateReply }) => {
       {
         $push: {
           messages: {
+            $slice: -MAX_STORED_MESSAGES,
             $each: [
               { role: "user", content: message },
               {
@@ -511,6 +504,16 @@ export const getChatHistory = async (req, res, next) => {
     const chat = await ChatHistory.findOne({ user: req.user._id, document: document._id });
 
     res.status(200).json(chat ? chat.messages : []);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const clearChatHistory = async (req, res, next) => {
+  try {
+    const document = await getOwnedDocument(req.params.documentId, req.user._id);
+    await ChatHistory.deleteOne({ user: req.user._id, document: document._id });
+    res.status(200).json({ message: "Chat cleared" });
   } catch (err) {
     next(err);
   }

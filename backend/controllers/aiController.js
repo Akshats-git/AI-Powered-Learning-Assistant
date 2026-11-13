@@ -246,7 +246,8 @@ export const generateSummary = async (req, res, next) => {
       return result;
     });
 
-    cacheSummary(document._id, contentHash, summary).catch(() => {});
+    // Awaited for the same reason as the chat cache below: a request right behind this one must see the write.
+    await cacheSummary(document._id, contentHash, summary).catch(() => {});
     res.status(200).json({ summary });
   } catch (err) {
     next(err);

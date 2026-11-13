@@ -32,14 +32,15 @@ export const summarySchema = requestSchema({
 export const explainSchema = requestSchema({
   body: z.object({
     ...documentIdBody,
-    concept: z.string().trim().min(1, "A concept is required"),
+    concept: z.string().trim().min(1, "A concept is required").max(200, "Concept is too long"),
   }),
 });
 
 export const chatSchema = requestSchema({
   body: z.object({
     ...documentIdBody,
-    message: z.string().trim().min(1, "A message is required"),
+    // Every chat message is billed as prompt tokens (plus history), so cap it.
+    message: z.string().trim().min(1, "A message is required").max(4000, "Message is too long (4000 characters max)"),
   }),
 });
 

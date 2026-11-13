@@ -112,11 +112,17 @@ export const submitQuiz = async (req, res, next) => {
     const total = quiz.questions.length;
     const score = total ? Math.round((correct / total) * 100) : 0;
 
-    quiz.userAnswers = userAnswers;
-    quiz.score = score;
-    quiz.isCompleted = true;
-    quiz.completedAt = new Date();
-    await quiz.save();
+    // One atomic "claim": the isCompleted filter means that of two simultaneous
+    // submits only one matches, so a double click can't grade (and record
+    // mastery for) the same quiz twice.
+    const claimed = await Quiz.findOneAndUpdate(
+      { _id: quiz._id, user: req.user._id, isCompleted: false },
+      { $set: { userAnswers, score, isCompleted: true, completedAt: new Date() } }
+    );
+    if (!claimed) {
+      res.status(409);
+      throw new Error("Quiz has already been submitted");
+    }
 
     await QuizAttempt.create({
       user: req.user._id,

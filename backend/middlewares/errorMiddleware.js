@@ -19,8 +19,22 @@ export const notFound = (req, res, next) => {
   next(new Error(`Route not found - ${req.originalUrl}`));
 };
 
+// Database errors that are really the client's doing, not a server fault.
+const classifyDbError = (err) => {
+  if (err.code === 11000) return { statusCode: 409, message: "That record already exists" };
+  if (err.name === "ValidationError") return { statusCode: 400, message: "Invalid data" };
+  if (err.name === "CastError") return { statusCode: 400, message: "Invalid identifier" };
+  return null;
+};
+
 export const errorHandler = (err, req, res, next) => {
-  const statusCode = err.statusCode || (res.statusCode && res.statusCode !== 200 ? res.statusCode : 500);
+  const db = !err.statusCode ? classifyDbError(err) : null;
+  const statusCode = db?.statusCode || err.statusCode || (res.statusCode && res.statusCode !== 200 ? res.statusCode : 500);
+  // In production a 5xx message is an internal detail (driver text, paths, upstream
+  // provider errors) — log it, but tell the client something generic. A 4xx
+  // message is written for the user, and an explicit err.code marks a deliberate one.
+  const hideMessage = process.env.NODE_ENV === "production" && statusCode >= 500 && !err.code;
+  const message = hideMessage ? "Something went wrong on our side. Please try again." : db?.message || err.message || "Server error";
 
   if (statusCode >= 500) {
     logger.error({ err, requestId: req.id, path: req.originalUrl }, err.message);
@@ -29,7 +43,7 @@ export const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({
     error: {
       code: err.code || DEFAULT_CODES[statusCode] || "INTERNAL_ERROR",
-      message: err.message || "Server error",
+      message,
       ...(err.details && { details: err.details }),
       requestId: req.id,
       ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),

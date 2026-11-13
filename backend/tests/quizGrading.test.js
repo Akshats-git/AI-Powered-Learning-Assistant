@@ -156,3 +156,17 @@ describe("quiz grading with {questionId, answer} pairs", () => {
     expect(res.body.questions[1]).toMatchObject({ userAnswer: "Paris", correctAnswer: "Paris", isCorrect: true });
   });
 });
+
+describe("quiz submission is atomic", () => {
+  it("two simultaneous submits grade it once: one 200, one 409, a single attempt", async () => {
+    const { user, token } = await createUserWithToken();
+    const doc = await Document.create({ user: user._id, title: "Doc", fileName: "d.pdf", filePath: "/tmp/d.pdf", fileSize: 10, mimeType: "application/pdf", extractedText: "text", hasExtractedText: true });
+    const quiz = await createQuiz(user._id, doc._id);
+    const body = { answers: quiz.questions.map((q) => ({ questionId: q._id.toString(), answer: q.correctAnswer })) };
+    const submit = () => request(app).post(`/api/quizzes/${quiz._id}/submit`).set("Authorization", `Bearer ${token}`).send(body);
+
+    const results = await Promise.all([submit(), submit(), submit()]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409, 409]);
+    expect(await QuizAttempt.countDocuments({ quiz: quiz._id })).toBe(1);
+  });
+});

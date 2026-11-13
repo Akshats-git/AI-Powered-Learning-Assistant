@@ -12,3 +12,6 @@ export const listDocuments = (params) => axiosInstance.get(API_PATHS.DOCUMENTS.L
 export const getDocument = (id) => axiosInstance.get(API_PATHS.DOCUMENTS.GET(id));
 
 export const deleteDocument = (id) => axiosInstance.delete(API_PATHS.DOCUMENTS.DELETE(id));
+
+// `fileUrl` comes from the API (`/api/documents/:id/file`) and needs the bearer token.
+export const fetchDocumentFile = (fileUrl) => axiosInstance.get(fileUrl, { responseType: "blob" });

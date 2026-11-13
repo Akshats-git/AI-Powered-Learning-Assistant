@@ -24,8 +24,9 @@ const cspPlugin = (apiOrigin) => ({
           "font-src 'self' https://fonts.gstatic.com",
           "img-src 'self' data: blob:",
           `connect-src 'self' ${apiOrigin}`,
-          // The PDF viewer iframe loads from the API's /uploads.
-          `frame-src ${apiOrigin}`,
+          // The PDF viewer iframe shows a blob: URL made from the authenticated
+          // fetch of /api/documents/:id/file — nothing is framed from the API itself.
+          "frame-src 'self' blob:",
           "object-src 'none'",
           "base-uri 'self'",
           "form-action 'self'",

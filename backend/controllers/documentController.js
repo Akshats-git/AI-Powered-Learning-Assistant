@@ -67,7 +67,9 @@ const toDocumentResponse = async (doc) => {
   const { extractedText, pageMap, ...rest } = doc.toObject();
   return {
     ...rest,
-    fileUrl: `/uploads/${doc.fileName}`,
+    // Behind auth + an ownership check (getDocumentFile) — PDFs used to be
+    // served from a public /uploads path to anyone holding the URL.
+    fileUrl: `/api/documents/${doc._id}/file`,
     fileMissing: !(await fileExists(doc.filePath)),
   };
 };
@@ -202,6 +204,31 @@ export const getDocument = async (req, res, next) => {
     document.lastAccessedAt = lastAccessedAt;
 
     res.status(200).json(await toDocumentResponse(document));
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/documents/:id/file — the PDF itself, only to its owner. The
+// frontend fetches it with the bearer token and renders it from a blob: URL
+// (an <iframe> can't send an Authorization header).
+export const getDocumentFile = async (req, res, next) => {
+  try {
+    const document = await getOwnedDocument(req.params.id, req.user._id);
+    if (!(await fileExists(document.filePath))) {
+      res.status(404);
+      throw new Error("This PDF is no longer available on the server. Re-upload it to view it again.");
+    }
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${String(document.title).replace(/[^\w .-]+/g, "_").slice(0, 100) || "document"}.pdf"`,
+      // Private user content: never let a shared cache keep a copy.
+      "Cache-Control": "private, no-store",
+    });
+    res.sendFile(document.filePath, (err) => {
+      if (err && !res.headersSent) next(err);
+    });
   } catch (err) {
     next(err);
   }

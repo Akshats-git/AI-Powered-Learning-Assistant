@@ -148,7 +148,10 @@ await step(page, "document card opens details page with 5 tabs", async () => {
   for (const t of ["Content", "Chat", "AI Actions", "Flashcards", "Quizzes"]) await page.getByText(t, { exact: true }).first().waitFor();
 });
 await step(page, "Content tab embeds the PDF viewer (iframe) + 'open in new tab' link", async () => {
+  await page.locator("iframe").waitFor();
   expect((await page.locator("iframe").count()) === 1, "expected one iframe");
+  const src = await page.locator("iframe").getAttribute("src");
+  expect(src.startsWith("blob:"), `PDF should be framed from an authenticated blob: fetch, got ${src}`);
   expect((await page.getByRole("link", { name: /new tab/i }).count()) >= 1, "expected open-in-new-tab link");
   await shot("06-content-tab");
 });

@@ -294,9 +294,12 @@ Netlify for example, or with `docker-compose.yml` below, and point
   changes and resets, session revocations and API-key changes are recorded
   (never with secrets). Admins read them at `GET /api/admin/audit`.
 - **Content Security Policy**: the API sends a deny-all policy (it only returns
-  JSON and PDFs), with framing of `/uploads/*` allowed for the frontend origin
-  only. The production frontend bundle ships a strict CSP `<meta>` with no
-  inline scripts, built from `VITE_API_BASE_URL`.
+  JSON and PDFs). The production frontend bundle ships a strict CSP `<meta>` with no
+  inline scripts, built from `VITE_API_BASE_URL`, and `vercel.json` / `nginx.conf`
+  add `frame-ancestors 'none'` and the usual hardening headers.
+- **Private PDFs**: uploaded files are never served statically. The app fetches
+  them from `GET /api/documents/:id/file`, which requires the owner's token, and
+  shows them from a `blob:` URL.
 
 ## Testing
 
@@ -336,7 +339,8 @@ Netlify for example, or with `docker-compose.yml` below, and point
   revokes it too, not just the browser cookie. A stolen access token is only
   useful for a few minutes. The refresh token never touches
   JavaScript-readable storage.
-- Uploaded files are stored on local disk under `backend/uploads/`. For a
+- Uploaded files are stored on local disk under `backend/uploads/` (served only
+  through the authenticated file endpoint above). For a
   production deploy with an ephemeral filesystem, swap in S3 or Cloudinary.
   Until then, a document whose file was wiped by a redeploy shows a "file no
   longer available" banner instead of a broken viewer. Chat, flashcards and

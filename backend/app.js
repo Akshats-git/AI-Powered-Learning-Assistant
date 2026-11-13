@@ -10,7 +10,6 @@ import { requestId } from "./middlewares/requestId.js";
 import { metricsMiddleware, metricsAuth, metricsHandler, circuitState } from "./utils/metrics.js";
 import { providerBreaker } from "./utils/circuitBreaker.js";
 import { isDraining } from "./utils/gracefulShutdown.js";
-import { UPLOAD_DIR } from "./middlewares/uploadMiddleware.js";
 import { httpLogger } from "./utils/logger.js";
 import authRoutes from "./routes/authRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
@@ -41,8 +40,8 @@ app.use(metricsMiddleware);
 app.use(httpLogger);
 // This server only ever returns JSON and PDF bytes — never HTML a browser
 // should render or run scripts from — so its CSP can be "nothing at all".
-// (It used to be switched off entirely so the PDF <iframe> could work; the
-// one route that needs framing gets its own narrower rule below instead.)
+// Nothing here is framed directly any more: the frontend fetches PDFs over
+// XHR and frames a blob: URL from its own origin.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -59,19 +58,8 @@ app.use(compression({ filter: (req, res) => !String(res.getHeader("Content-Type"
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true, exposedHeaders: ["Content-Disposition", "Idempotent-Replay"] }));
 app.use(express.json());
 app.use(cookieParser());
-app.use(
-  "/uploads",
-  (req, res, next) => {
-    // Uploaded PDFs are shown in an <iframe> on the frontend's origin: allow
-    // framing by that origin only, instead of by anyone (or by no one).
-    res.removeHeader("X-Frame-Options");
-    res.setHeader("Content-Security-Policy", `frame-ancestors ${process.env.CLIENT_URL || "'self'"}`);
-    next();
-  },
-  // Same directory multer writes to — they used to be resolved differently
-  // (cwd vs. this file's folder) and only agreed when started from backend/.
-  express.static(UPLOAD_DIR)
-);
+// Uploaded PDFs are deliberately NOT served statically: they're private, so
+// they go through GET /api/documents/:id/file (auth + ownership check).
 
 // Liveness: the process is up and serving requests. A load balancer or
 // orchestrator uses this to decide whether to restart the container — it

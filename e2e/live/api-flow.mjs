@@ -144,9 +144,14 @@ try {
     check("embedding API was called (batched)", fake.count((c) => c.kind === "embeddings") >= 1 && fake.state.embeddedInputs === chunks.length, `inputs=${fake.state.embeddedInputs} chunks=${chunks.length}`);
     check("embedding spend recorded in the LlmCall ledger", (await db.collection("llmcalls").countDocuments({ feature: "embedding" })) >= 1);
 
-    const file = await fetch(main.base + docA.fileUrl);
-    check("served PDF at fileUrl: 200 application/pdf", file.status === 200 && /pdf/.test(file.headers.get("content-type") || ""), `${file.status} ${file.headers.get("content-type")}`);
-    check("served PDF is iframe-embeddable ONLY by the frontend origin (CSP frame-ancestors)", file.headers.get("x-frame-options") == null && file.headers.get("content-security-policy") === `frame-ancestors ${CLIENT_URL}`, `${file.headers.get("x-frame-options")} | ${file.headers.get("content-security-policy")}`);
+    const file = await A.req("GET", docA.fileUrl);
+    check("owner gets the PDF at fileUrl: 200 application/pdf, private no-store", file.status === 200 && /pdf/.test(file.headers.get("content-type") || "") && file.headers.get("cache-control") === "private, no-store", `${file.status} ${file.headers.get("content-type")} ${file.headers.get("cache-control")}`);
+    const anon = await fetch(main.base + docA.fileUrl);
+    check("PDF is NOT served without auth (401)", anon.status === 401, `${anon.status}`);
+    const foreign = await B.req("GET", docA.fileUrl);
+    check("PDF is NOT served to another user (404)", foreign.status === 404, `${foreign.status}`);
+    const legacy = await fetch(`${main.base}/uploads/${docA.fileName}`);
+    check("old public /uploads/<file> path is gone (404)", legacy.status === 404, `${legacy.status}`);
 
     r = await A.req("GET", "/api/documents?limit=1000");
     check("list: paginated envelope {items,page,limit,total,totalPages}, limit clamped to 50", r.body.items && r.body.limit === 50 && r.body.total >= 1 && r.body.totalPages >= 1, JSON.stringify({ ...r.body, items: undefined }));

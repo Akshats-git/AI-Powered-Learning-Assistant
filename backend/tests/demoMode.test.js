@@ -35,7 +35,7 @@ describe("POST /api/auth/demo", () => {
     expect(docs.body.total).toBe(1);
     const doc = docs.body.items[0];
     expect(doc).toMatchObject({ hasExtractedText: true, fileMissing: false, pageCount: 3, flashcardCount: 1, quizCount: 1 });
-    expect((await request(app).get(doc.fileUrl)).headers["content-type"]).toMatch(/pdf/);
+    expect((await request(app).get(doc.fileUrl).set(auth)).headers["content-type"]).toMatch(/pdf/);
 
     const sets = await request(app).get("/api/flashcards").set(auth);
     expect(sets.body.items[0]).toMatchObject({ totalCards: 8, reviewedCount: 5 });

@@ -3,6 +3,7 @@ import {
   uploadDocument,
   listDocuments,
   getDocument,
+  getDocumentFile,
   deleteDocument,
 } from "../controllers/documentController.js";
 import { protect } from "../middlewares/authMiddleware.js";
@@ -28,6 +29,7 @@ router.use(protect);
 router.post("/upload", uploadSingle, attachAiKeyContext, uploadDocument);
 router.get("/", listDocuments);
 router.get("/:id", validate(idParamsSchema("id")), getDocument);
+router.get("/:id/file", validate(idParamsSchema("id")), getDocumentFile);
 router.delete("/:id", validate(idParamsSchema("id")), deleteDocument);
 
 export default router;

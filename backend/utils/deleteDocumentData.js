@@ -4,6 +4,7 @@ import Quiz from "../models/Quiz.js";
 import QuizAttempt from "../models/QuizAttempt.js";
 import ChatHistory from "../models/ChatHistory.js";
 import Mastery from "../models/Mastery.js";
+import { invalidateChunkCache } from "./chunkCache.js";
 import GenerationCache from "../models/GenerationCache.js";
 
 // Everything derived from a document's content. Deleting only the Document row
@@ -26,4 +27,5 @@ export const deleteDocumentData = async (documentId) => {
     Mastery.deleteMany(filter),
     GenerationCache.deleteMany(filter),
   ]);
+  invalidateChunkCache(documentId);
 };

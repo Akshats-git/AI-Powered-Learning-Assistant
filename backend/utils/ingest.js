@@ -4,6 +4,7 @@ import { hashChunkText, embedTexts, EMBEDDING_MODEL } from "./embeddings.js";
 import { assertWithinBudget, recordSpend } from "./aiBudget.js";
 import { recordLlmCall } from "./llmLedger.js";
 import { hasActiveApiKey } from "./aiContext.js";
+import { invalidateChunkCache } from "./chunkCache.js";
 import { logger } from "./logger.js";
 
 // The rest of the ingest pipeline the roadmap describes:
@@ -64,6 +65,7 @@ export const ingestDocument = async (document, { requestId = null } = {}) => {
 
   if (chunks.length === 0) {
     await Chunk.deleteMany({ document: document._id });
+    invalidateChunkCache(document._id);
     return { chunkCount: 0, embeddedCount: 0, reusedCount: 0 };
   }
 
@@ -78,6 +80,7 @@ export const ingestDocument = async (document, { requestId = null } = {}) => {
   const cacheByHash = new Map(cached.map((c) => [c.contentHash, c]));
 
   await Chunk.deleteMany({ document: document._id });
+  invalidateChunkCache(document._id);
 
   const { toEmbed, reused } = partitionChunksToEmbed(chunks, cacheByHash.keys());
 
@@ -140,6 +143,8 @@ export const ingestDocument = async (document, { requestId = null } = {}) => {
       ...(chunk.embedding ? { embedding: chunk.embedding, embeddingModel: chunk.embeddingModel } : {}),
     }))
   );
+
+  invalidateChunkCache(document._id);
 
   return {
     chunkCount: chunks.length,

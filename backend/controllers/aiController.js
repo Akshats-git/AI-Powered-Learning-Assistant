@@ -31,6 +31,7 @@ import { rewriteQuery } from "../utils/queryRewrite.js";
 import { getCachedChatReply, cacheChatReply, getCachedSummary, cacheSummary } from "../utils/semanticCache.js";
 import { hashChunkText } from "../utils/embeddings.js";
 import { hasActiveApiKey } from "../utils/aiContext.js";
+import { loadRetrievalChunks } from "../utils/chunkCache.js";
 import { sanitizeFlashcards, sanitizeQuestions } from "../utils/generationOutput.js";
 import { logger } from "../utils/logger.js";
 
@@ -83,7 +84,7 @@ const CONCEPT_CONTEXT_CHUNKS = 8;
 // Context for practising ONE concept: hybrid retrieval with the concept as the
 // query (the same machinery chat uses), instead of sampling the whole document.
 const buildConceptContext = async (document, concept, { userId, requestId }) => {
-  const chunks = await Chunk.find({ document: document._id }).select("text page endPage sectionPath embedding charStart").lean();
+  const chunks = await loadRetrievalChunks(document._id);
   if (chunks.length === 0) return { context: document.extractedText, retrieved: false };
 
   const queryEmbedding = await embedQuery(concept, { userId, requestId, documentId: document._id });
@@ -311,9 +312,7 @@ const embedQuery = async (message, { userId, requestId, documentId }) => {
 const buildChatPrompt = async ({ document, message, recentHistory, searchQuery, queryEmbedding, userId, requestId }) => {
   const wholeDocumentFallback = () => ({ prompt: chatPrompt(document.extractedText, recentHistory, message), sources: [], retrievedContext: null });
 
-  const chunks = await Chunk.find({ document: document._id })
-    .select("text page endPage sectionPath embedding charStart")
-    .lean();
+  const chunks = await loadRetrievalChunks(document._id);
   if (chunks.length === 0) return wholeDocumentFallback();
 
   const fused = hybridSearch({

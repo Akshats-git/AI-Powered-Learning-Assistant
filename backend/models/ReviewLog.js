@@ -2,11 +2,9 @@ import mongoose from "mongoose";
 
 // An append-only history of every graded review, independent of whatever the
 // card's current scheduling state says. Two things need this to be
-// immutable rather than derived: (1) the scheduler-comparison experiment
-// (roadmap: "replay those logs against both schedulers") needs the exact
-// sequence of real grades a card was ever given, not just its current state;
-// (2) a retention-forecast chart needs real history to validate its
-// predictions against. No route ever updates or deletes a row here.
+// immutable rather than derived: (1) replaying a card's exact sequence of
+// real grades, not just its current state; (2) a retention-forecast
+// chart needs real history to validate its predictions against. No route ever updates or deletes a row here.
 const reviewLogSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
@@ -15,7 +13,7 @@ const reviewLogSchema = new mongoose.Schema(
     // own _id, which is what a card keeps as it's reviewed over time even
     // though it has no top-level collection of its own.
     cardId: { type: mongoose.Schema.Types.ObjectId, required: true },
-    algorithm: { type: String, enum: ["fsrs", "sm2"], required: true },
+    algorithm: { type: String, enum: ["fsrs"], required: true },
     grade: { type: String, enum: ["again", "hard", "good", "easy"], required: true },
     reviewedAt: { type: Date, required: true, default: Date.now },
     elapsedDays: { type: Number, default: null },

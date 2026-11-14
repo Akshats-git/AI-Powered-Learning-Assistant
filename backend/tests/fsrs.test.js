@@ -125,7 +125,7 @@ describe("scheduleFsrs", () => {
     }
   });
 
-  it("accepts an alternate parameter set (for the SM-2/FSRS comparison replay)", () => {
+  it("accepts an alternate parameter set", () => {
     const altParams = FSRS_DEFAULT_PARAMETERS.map((v) => v * 1.1);
     const withDefaults = scheduleFsrs(createInitialFsrsState(), "good", now);
     const withAlt = scheduleFsrs(createInitialFsrsState(), "good", now, { parameters: altParams });

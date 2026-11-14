@@ -1,6 +1,5 @@
-// FSRS (Free Spaced Repetition Scheduler) — the algorithm SM-2 (utils/sm2.js)
-// is the documented baseline for. Where SM-2 tracks one number (an ease
-// factor) per card, FSRS tracks memory as two explicit quantities —
+// FSRS (Free Spaced Repetition Scheduler). It tracks memory as two explicit
+// quantities per card —
 // stability (days until recall probability decays to ~90%) and difficulty
 // (how hard this specific card is to remember, independent of how long it's
 // been studied) — and derives the next interval from a target retention

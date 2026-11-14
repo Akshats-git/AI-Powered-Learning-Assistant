@@ -10,7 +10,7 @@ import mongoose from "mongoose";
 //
 // `dueDate` defaults to card-creation time, which is exactly right without
 // any special-casing — a brand-new card should show up in the due queue
-// immediately, the same way SM-2/FSRS treat an unseen card as due "now."
+// immediately, the same way FSRS treats an unseen card as due "now."
 const scheduleSchema = new mongoose.Schema(
   {
     stability: { type: Number, default: null },

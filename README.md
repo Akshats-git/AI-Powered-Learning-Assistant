@@ -90,7 +90,6 @@ Things to know:
 
 ## More docs
 
-- [FSRS vs. SM-2 scheduler comparison](docs/scheduler-comparison.md)
 - [RAG evaluation](e2e/evals/README.md)
 - [Roadmap](ROADMAP.md)
 

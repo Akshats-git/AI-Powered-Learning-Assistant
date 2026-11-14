@@ -107,8 +107,8 @@ export const reviewCard = async (req, res, next) => {
     await set.save();
 
     // An immutable record of the grade itself — the card's `schedule` above
-    // only ever holds its *current* state, and the scheduler-comparison
-    // experiment (and any future retention chart) needs the full history.
+    // only ever holds its *current* state, and a retention
+    // chart needs the full history.
     await ReviewLog.create({
       user: req.user._id,
       flashcardSet: set._id,

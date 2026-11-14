@@ -148,10 +148,14 @@ await step(page, "document card opens details page with 5 tabs", async () => {
   for (const t of ["Content", "Chat", "AI Actions", "Flashcards", "Quizzes"]) await page.getByText(t, { exact: true }).first().waitFor();
 });
 await step(page, "Content tab embeds the PDF viewer (iframe) + 'open in new tab' link", async () => {
-  await page.locator("iframe").waitFor();
-  expect((await page.locator("iframe").count()) === 1, "expected one iframe");
-  const src = await page.locator("iframe").getAttribute("src");
-  expect(src.startsWith("blob:"), `PDF should be framed from an authenticated blob: fetch, got ${src}`);
+  // Headless Chrome has no built-in PDF viewer, so it gets pdf.js; a desktop browser gets the iframe.
+  await page.locator("iframe, [data-testid=pdfjs-viewer]").first().waitFor();
+  if (await page.locator("iframe").count()) {
+    const src = await page.locator("iframe").getAttribute("src");
+    expect(src.startsWith("blob:"), `PDF should be framed from an authenticated blob: fetch, got ${src}`);
+  } else {
+    await page.waitForFunction(() => document.querySelectorAll("[data-testid=pdfjs-viewer] canvas").length > 0);
+  }
   expect((await page.getByRole("link", { name: /new tab/i }).count()) >= 1, "expected open-in-new-tab link");
   await shot("06-content-tab");
 });
@@ -170,10 +174,40 @@ await step(page, "Chat: ask a question -> markdown answer with 'N sources' + pag
 await step(page, "Chat: clicking a citation jumps the PDF viewer to that exact page", async () => {
   await page.getByRole("button", { name: "Open page 22 in the document" }).click();
   await page.getByText("Showing page 22").waitFor();
-  const src = await page.locator("iframe").getAttribute("src");
-  expect(/#page=22$/.test(src), `iframe should target page 22, got ${src}`);
+  if (await page.locator("iframe").count()) {
+    const src = await page.locator("iframe").getAttribute("src");
+    expect(/#page=22$/.test(src), `iframe should target page 22, got ${src}`);
+  } // (the pdf.js branch of this jump is verified in its own step below)
   await tab("Chat").click();
   await page.getByText(/bounded monotone sequence/i).first().waitFor();
+});
+await step(page, "pdf.js viewer (phones / no built-in viewer): draws real pixels, and a citation scrolls to page 22", async () => {
+  const base = page.url().split("?")[0];
+  await page.goto(`${base}?viewer=pdfjs`);
+  const viewer = page.getByTestId("pdfjs-viewer");
+  await viewer.waitFor();
+  expect((await page.locator("iframe").count()) === 0, "pdf.js mode must not use the iframe");
+  const inked = (n) => page.waitForFunction((pageNo) => {
+    const c = document.querySelector(`[data-page="${pageNo}"] canvas`);
+    if (!c || !c.width) return false;
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 200) return true; // any dark pixel = text was drawn
+    return false;
+  }, n, { timeout: 15000 });
+  await inked(1);
+  await tab("Chat").click();
+  await page.getByRole("button", { name: /\d+ sources?/ }).first().click(); // sources start collapsed after a reload
+  await page.getByRole("button", { name: "Open page 22 in the document" }).click();
+  await page.getByText("Showing page 22").waitFor();
+  await inked(22);
+  const offset = await page.evaluate(() => {
+    const v = document.querySelector("[data-testid=pdfjs-viewer]");
+    const p = document.querySelector('[data-page="22"]');
+    return { scrollTop: v.scrollTop, target: p.offsetTop };
+  });
+  expect(offset.scrollTop > 1000 && Math.abs(offset.scrollTop - (offset.target - 12)) < 60, `viewer should be scrolled to page 22, got ${JSON.stringify(offset)}`);
+  await shot("06b-pdfjs-viewer");
+  await tab("Chat").click();
 });
 await step(page, "Chat: hallucinated reply shows the 'not fully supported' warning", async () => {
   await page.getByPlaceholder(/Ask a question/).fill("Tell me about the Krebs moon");

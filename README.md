@@ -51,7 +51,15 @@ seconds to wake it back up. After that it's fast.
 - **Export**: Download a deck as CSV or as Anki's text-import format, and a
   finished quiz as Markdown.
 - **Dashboard**: See your document, flashcard and quiz counts, plus recent
-  activity.
+  activity, and a one-tap banner when cards are due for review.
+- **Your data**: Rename documents, clear a chat, retake any finished quiz
+  (as a fresh copy, so the old score stays), download everything the app
+  holds about you as JSON, and delete your account and all of it (it asks
+  for your password first).
+- **Works on phones**: the PDF viewer falls back to pdf.js where the browser
+  has no inline viewer (Android, iOS), and citations still jump to the right
+  page. Touch targets are at least 36px and motion respects
+  `prefers-reduced-motion`.
 
 ## Tech stack
 
@@ -292,6 +300,14 @@ Netlify for example, or with `docker-compose.yml` below, and point
   `/generate-flashcards` and `/generate-quiz`. A retry with the same key replays
   the first response instead of paying for and saving a second generation. The
   frontend does this for you.
+- **Prompt-injection guard**: every model call carries a system message that
+  says document text is data, never instructions. It is a mitigation, not a
+  guarantee, so the model never gets tools or other users' data to misuse.
+- **Retrieval cache**: a document's chunks and vectors are cached in memory
+  (LRU, 5 minute TTL, `CHUNK_CACHE_MAX_CHUNKS` / `CHUNK_CACHE_TTL_MS`) so a
+  burst of questions doesn't re-read tens of megabytes from MongoDB each time.
+  Re-ingesting or deleting a document drops its entry. OpenAI calls time out
+  after `OPENAI_TIMEOUT_MS` (default 60 s).
 - **Audit log**: logins, failed logins, lockouts, refresh-token reuse, password
   changes and resets, session revocations and API-key changes are recorded
   (never with secrets). Admins read them at `GET /api/admin/audit`.
@@ -307,8 +323,8 @@ Netlify for example, or with `docker-compose.yml` below, and point
 
 | Command | What it covers |
 |---|---|
-| `cd backend && npm test` | 500+ unit and integration tests against an in-memory MongoDB |
-| `cd frontend/ai-learning-assistant && npm test` | 160+ component and unit tests |
+| `cd backend && npm test` | 540+ unit and integration tests against an in-memory MongoDB |
+| `cd frontend/ai-learning-assistant && npm test` | 190+ component and unit tests |
 | `cd e2e && npm test` | Playwright smoke tests (register, upload) |
 | `cd e2e && npm run test:full` | The whole product: an API journey and two real-browser journeys (dev server and the production build under its CSP), against a fake OpenAI server |
 | `cd e2e && npm run eval:check` | RAG evals: retrieval, citation and answer scores over a 100-question gold set, failing on a regression. See [e2e/evals/README.md](e2e/evals/README.md) for what it does and doesn't show |

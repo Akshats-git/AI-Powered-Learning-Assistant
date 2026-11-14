@@ -2,8 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ContentTab from "./ContentTab";
 import { fetchDocumentFile } from "../../../services/documentService";
+import { shouldUsePdfJs } from "../../../utils/pdfSupport";
 
 vi.mock("../../../services/documentService", () => ({ fetchDocumentFile: vi.fn() }));
+vi.mock("../../../utils/pdfSupport", () => ({ shouldUsePdfJs: vi.fn(() => false) }));
+vi.mock("./PdfJsViewer", () => ({ default: ({ blob, page }) => <div data-testid="pdfjs-stub">{`pdfjs page=${page} bytes=${blob?.size > 0}`}</div> }));
 
 const doc = { title: "Paper", fileUrl: "/api/documents/abc/file" };
 
@@ -11,6 +14,7 @@ beforeEach(() => {
   vi.mocked(fetchDocumentFile).mockReset().mockResolvedValue({ data: new Blob(["%PDF-"]) });
   URL.createObjectURL = vi.fn(() => "blob:http://app/pdf-1");
   URL.revokeObjectURL = vi.fn();
+  vi.mocked(shouldUsePdfJs).mockReturnValue(false);
 });
 
 describe("ContentTab", () => {
@@ -53,5 +57,13 @@ describe("ContentTab", () => {
     render(<ContentTab document={doc} />);
     expect(await screen.findByText(/couldn.t be loaded/i)).toBeInTheDocument();
     expect(screen.queryByTitle("Paper")).not.toBeInTheDocument();
+  });
+
+  it("uses pdf.js instead of the iframe where the browser has no inline viewer, passing it the bytes and the page", async () => {
+    vi.mocked(shouldUsePdfJs).mockReturnValue(true);
+    render(<ContentTab document={doc} page={22} />);
+    expect(await screen.findByTestId("pdfjs-stub")).toHaveTextContent("pdfjs page=22 bytes=true");
+    expect(screen.queryByTitle("Paper")).not.toBeInTheDocument();
+    expect(screen.getByText("Showing page 22")).toBeInTheDocument();
   });
 });

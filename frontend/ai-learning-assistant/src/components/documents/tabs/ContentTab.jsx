@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ExternalLink, FileWarning } from "lucide-react";
 import { fetchDocumentFile } from "../../../services/documentService";
+import { shouldUsePdfJs } from "../../../utils/pdfSupport";
+
+// Only downloaded where the browser has no usable PDF viewer of its own (phones, mostly).
+const PdfJsViewer = lazy(() => import("./PdfJsViewer"));
 
 // The PDF sits behind auth (GET /api/documents/:id/file), and an <iframe> can't
 // send a bearer token — so fetch it over XHR (which also gets the silent token
 // refresh for free) and show it from a same-origin blob: URL.
 const usePdfBlobUrl = (document) => {
-  const [state, setState] = useState({ url: null, error: false });
+  const [state, setState] = useState({ url: null, blob: null, error: false });
   const skip = !document.fileUrl || document.fileMissing;
 
   useEffect(() => {
@@ -16,11 +20,12 @@ const usePdfBlobUrl = (document) => {
     fetchDocumentFile(document.fileUrl)
       .then((res) => {
         if (cancelled) return;
-        objectUrl = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
-        setState({ url: objectUrl, error: false });
+        const blob = new Blob([res.data], { type: "application/pdf" });
+        objectUrl = URL.createObjectURL(blob);
+        setState({ url: objectUrl, blob, error: false });
       })
       .catch(() => {
-        if (!cancelled) setState({ url: null, error: true });
+        if (!cancelled) setState({ url: null, blob: null, error: true });
       });
     return () => {
       cancelled = true;
@@ -29,13 +34,13 @@ const usePdfBlobUrl = (document) => {
     };
   }, [document.fileUrl, skip]);
 
-  return skip ? { url: null, error: false } : state;
+  return skip ? { url: null, blob: null, error: false } : state;
 };
 
 // `page` (optional) opens the viewer on that page — used when a chat citation is clicked.
 // The browser's built-in PDF viewer honours a #page=N fragment.
 const ContentTab = ({ document, page = null }) => {
-  const { url, error } = usePdfBlobUrl(document);
+  const { url, blob, error } = usePdfBlobUrl(document);
 
   let body;
   if (document.fileMissing || error) {
@@ -51,6 +56,12 @@ const ContentTab = ({ document, page = null }) => {
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-primary motion-reduce:animate-none" />
         <span className="sr-only">Loading PDF</span>
       </div>
+    );
+  } else if (shouldUsePdfJs()) {
+    body = (
+      <Suspense fallback={<div className="h-[75vh]" />}>
+        <PdfJsViewer blob={blob} page={page} title={document.title} />
+      </Suspense>
     );
   } else {
     // Keyed by page: changing only the #fragment doesn't make a PDF viewer scroll, remounting does.

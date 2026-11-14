@@ -1,5 +1,6 @@
 import axiosInstance from "../utils/axiosInstance";
 import { API_PATHS } from "../utils/apiPaths";
+import { saveBlob, filenameFromDisposition } from "../utils/download";
 
 export const register = (data) => axiosInstance.post(API_PATHS.AUTH.REGISTER, data);
 
@@ -33,3 +34,12 @@ export const revokeSession = (familyId) => axiosInstance.delete(API_PATHS.AUTH.R
 export const saveApiKey = (apiKey) => axiosInstance.put(API_PATHS.AUTH.API_KEY, { apiKey });
 
 export const removeApiKey = () => axiosInstance.delete(API_PATHS.AUTH.API_KEY);
+
+// Everything held about you, as a JSON file.
+export const downloadMyData = async () => {
+  const res = await axiosInstance.get(API_PATHS.AUTH.EXPORT, { responseType: "blob" });
+  saveBlob(res.data, filenameFromDisposition(res.headers["content-disposition"], "studyai-export.json"));
+};
+
+// Irreversible; the server re-checks the password.
+export const deleteAccount = (password) => axiosInstance.delete(API_PATHS.AUTH.ACCOUNT, { data: { password } });

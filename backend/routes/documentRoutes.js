@@ -4,13 +4,14 @@ import {
   listDocuments,
   getDocument,
   getDocumentFile,
+  renameDocument,
   deleteDocument,
 } from "../controllers/documentController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { attachAiKeyContext } from "../middlewares/aiKeyContext.js";
 import { upload } from "../middlewares/uploadMiddleware.js";
 import { validate } from "../middlewares/validate.js";
-import { idParamsSchema } from "../validators/requestSchema.js";
+import { idParamsSchema, renameDocumentSchema } from "../validators/requestSchema.js";
 
 const router = express.Router();
 
@@ -30,6 +31,7 @@ router.post("/upload", uploadSingle, attachAiKeyContext, uploadDocument);
 router.get("/", listDocuments);
 router.get("/:id", validate(idParamsSchema("id")), getDocument);
 router.get("/:id/file", validate(idParamsSchema("id")), getDocumentFile);
+router.patch("/:id", validate(renameDocumentSchema), renameDocument);
 router.delete("/:id", validate(idParamsSchema("id")), deleteDocument);
 
 export default router;

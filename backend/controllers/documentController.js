@@ -234,6 +234,17 @@ export const getDocumentFile = async (req, res, next) => {
   }
 };
 
+export const renameDocument = async (req, res, next) => {
+  try {
+    const document = await getOwnedDocument(req.params.id, req.user._id);
+    document.title = req.body.title;
+    await document.save();
+    res.status(200).json(await toDocumentResponse(document));
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const deleteDocument = async (req, res, next) => {
   try {
     const document = await getOwnedDocument(req.params.id, req.user._id);

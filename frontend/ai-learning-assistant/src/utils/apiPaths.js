@@ -14,11 +14,14 @@ export const API_PATHS = {
     SESSIONS: "/api/auth/sessions",
     REVOKE_SESSION: (familyId) => `/api/auth/sessions/${familyId}`,
     API_KEY: "/api/auth/api-key",
+    EXPORT: "/api/auth/export",
+    ACCOUNT: "/api/auth/account",
   },
   DOCUMENTS: {
     UPLOAD: "/api/documents/upload",
     LIST: "/api/documents",
     GET: (id) => `/api/documents/${id}`,
+    RENAME: (id) => `/api/documents/${id}`,
     DELETE: (id) => `/api/documents/${id}`,
   },
   AI: {
@@ -46,6 +49,7 @@ export const API_PATHS = {
     SUBMIT: (id) => `/api/quizzes/${id}/submit`,
     RESULTS: (id) => `/api/quizzes/${id}/results`,
     EXPORT: (id) => `/api/quizzes/${id}/export`,
+    RETAKE: (id) => `/api/quizzes/${id}/retake`,
     DELETE: (id) => `/api/quizzes/${id}`,
   },
   SEARCH: "/api/search",

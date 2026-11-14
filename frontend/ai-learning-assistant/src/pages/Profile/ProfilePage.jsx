@@ -4,6 +4,7 @@ import { User, Mail, Lock } from "lucide-react";
 
 import { useAuth } from "../../hooks/useAuth";
 import { updatePassword } from "../../services/authService";
+import DataAndAccount from "../../components/profile/DataAndAccount";
 import ActiveSessions from "../../components/profile/ActiveSessions";
 import ApiKeySettings from "../../components/profile/ApiKeySettings";
 
@@ -160,6 +161,8 @@ const ProfilePage = () => {
       <ApiKeySettings />
 
       <ActiveSessions />
+
+      <DataAndAccount />
     </div>
   );
 };

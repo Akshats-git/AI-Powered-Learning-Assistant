@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { Trophy, CheckCircle2, XCircle, ArrowLeft, Download } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { Trophy, CheckCircle2, XCircle, ArrowLeft, Download, RotateCcw } from "lucide-react";
 
-import { getQuizResults, downloadQuiz } from "../../services/quizService";
+import { getQuizResults, downloadQuiz, retakeQuiz } from "../../services/quizService";
 
 const ENCOURAGEMENT = (pct) => {
   if (pct >= 90) return "Outstanding work!";
@@ -13,6 +13,8 @@ const ENCOURAGEMENT = (pct) => {
 
 const QuizResultPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const [retaking, setRetaking] = useState(false);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notReady, setNotReady] = useState(false);
@@ -23,6 +25,16 @@ const QuizResultPage = () => {
       .catch(() => setNotReady(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleRetake = async () => {
+    setRetaking(true);
+    try {
+      const res = await retakeQuiz(id);
+      navigate(`/quizzes/${res.data._id}`);
+    } catch {
+      setRetaking(false);
+    }
+  };
 
   if (loading) {
     return <div className="h-64 bg-white rounded-xl border border-gray-100 animate-pulse" />;
@@ -56,7 +68,7 @@ const QuizResultPage = () => {
         </p>
         <p className="text-sm text-gray-500 mb-6">{ENCOURAGEMENT(results.percentage)}</p>
 
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-3">
           <span className="px-3 py-1.5 rounded-full bg-gray-50 text-gray-600 text-xs font-medium">
             Total: {results.total}
           </span>
@@ -67,6 +79,15 @@ const QuizResultPage = () => {
             Incorrect: {results.incorrect}
           </span>
         </div>
+
+        <button
+          onClick={handleRetake}
+          disabled={retaking}
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+        >
+          <RotateCcw className="w-4 h-4" />
+          {retaking ? "Preparing..." : "Retake quiz"}
+        </button>
       </div>
 
       <div className="space-y-4 mb-6">

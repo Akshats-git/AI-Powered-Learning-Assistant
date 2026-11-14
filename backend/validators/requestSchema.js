@@ -21,3 +21,8 @@ export const idParamsSchema = (...names) =>
   requestSchema({
     params: z.object(Object.fromEntries(names.map((name) => [name, objectId(name)]))),
   });
+
+export const renameDocumentSchema = requestSchema({
+  params: z.object({ id: objectId("id") }),
+  body: z.object({ title: z.string().trim().min(1, "A title is required").max(200, "Title is too long (200 characters max)") }),
+});

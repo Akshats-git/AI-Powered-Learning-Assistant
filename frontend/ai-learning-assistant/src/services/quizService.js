@@ -13,6 +13,9 @@ export const submitQuiz = (id, answers) => axiosInstance.post(API_PATHS.QUIZZES.
 
 export const getQuizResults = (id) => axiosInstance.get(API_PATHS.QUIZZES.RESULTS(id));
 
+// A fresh, unanswered copy of a finished quiz (the old score is kept).
+export const retakeQuiz = (id) => axiosInstance.post(API_PATHS.QUIZZES.RETAKE(id));
+
 export const deleteQuiz = (id) => axiosInstance.delete(API_PATHS.QUIZZES.DELETE(id));
 
 // A finished quiz, with the answer key and your answers, as Markdown.

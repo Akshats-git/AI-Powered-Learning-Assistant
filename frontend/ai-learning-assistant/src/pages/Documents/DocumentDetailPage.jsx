@@ -3,7 +3,9 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, Info } from "lucide-react";
 
 import { usePageTitle } from "../../hooks/usePageTitle";
-import { getDocument } from "../../services/documentService";
+import { getDocument, renameDocument } from "../../services/documentService";
+import EditableTitle from "../../components/documents/EditableTitle";
+import { useAuth } from "../../hooks/useAuth";
 import ContentTab from "../../components/documents/tabs/ContentTab";
 import ChatTab from "../../components/documents/tabs/ChatTab";
 import AIActionsTab from "../../components/documents/tabs/AIActionsTab";
@@ -20,6 +22,7 @@ const TABS = [
 
 const DocumentDetailPage = () => {
   const { id } = useParams();
+  const { user } = useAuth();
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
@@ -62,7 +65,14 @@ const DocumentDetailPage = () => {
         Back to Documents
       </Link>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-4 truncate">{document.title}</h1>
+      <EditableTitle
+        title={document.title}
+        readOnly={user?.isDemo}
+        onSave={async (title) => {
+          const res = await renameDocument(document._id, title);
+          setDocument((prev) => ({ ...prev, title: res.data.title }));
+        }}
+      />
 
       {document.hasExtractedText === false && (
         <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 mb-6 text-sm text-amber-800">

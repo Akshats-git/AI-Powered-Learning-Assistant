@@ -218,6 +218,28 @@ export const exportQuiz = async (req, res, next) => {
   }
 };
 
+// POST /api/quizzes/:id/retake — a fresh, unanswered copy of a finished quiz. A new Quiz
+// (not a reset of the old one) so the previous score and its attempt history stay intact.
+export const retakeQuiz = async (req, res, next) => {
+  try {
+    const source = await findOwnedQuiz(req.params.id, req.user._id);
+    if (!source.isCompleted) {
+      res.status(400);
+      throw new Error("Finish this quiz before retaking it");
+    }
+
+    const copy = await Quiz.create({
+      user: req.user._id,
+      document: source.document,
+      title: source.title,
+      questions: source.questions.map(({ question, options, correctAnswer, explanation, concept }) => ({ question, options, correctAnswer, explanation, concept })),
+    });
+    res.status(201).json(stripAnswers(copy));
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const deleteQuiz = async (req, res, next) => {
   try {
     const quiz = await findOwnedQuiz(req.params.id, req.user._id);

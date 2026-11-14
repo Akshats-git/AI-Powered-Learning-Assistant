@@ -16,6 +16,7 @@ import {
   updateApiKey,
   removeApiKey,
 } from "../controllers/authController.js";
+import { deleteAccount, exportMyData } from "../controllers/accountController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { validate } from "../middlewares/validate.js";
 import { authRateLimiter } from "../middlewares/rateLimiter.js";
@@ -28,6 +29,7 @@ import {
   verifyEmailSchema,
   revokeSessionSchema,
   updateApiKeySchema,
+  deleteAccountSchema,
 } from "../validators/authSchemas.js";
 
 const router = express.Router();
@@ -47,5 +49,7 @@ router.get("/sessions", protect, listSessions);
 router.delete("/sessions/:familyId", protect, validate(revokeSessionSchema), revokeSession);
 router.put("/api-key", protect, validate(updateApiKeySchema), updateApiKey);
 router.delete("/api-key", protect, removeApiKey);
+router.get("/export", protect, exportMyData);
+router.delete("/account", protect, authRateLimiter, validate(deleteAccountSchema), deleteAccount);
 
 export default router;

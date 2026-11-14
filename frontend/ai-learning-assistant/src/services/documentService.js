@@ -11,6 +11,8 @@ export const listDocuments = (params) => axiosInstance.get(API_PATHS.DOCUMENTS.L
 
 export const getDocument = (id) => axiosInstance.get(API_PATHS.DOCUMENTS.GET(id));
 
+export const renameDocument = (id, title) => axiosInstance.patch(API_PATHS.DOCUMENTS.RENAME(id), { title });
+
 export const deleteDocument = (id) => axiosInstance.delete(API_PATHS.DOCUMENTS.DELETE(id));
 
 // `fileUrl` comes from the API (`/api/documents/:id/file`) and needs the bearer token.

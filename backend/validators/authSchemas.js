@@ -58,3 +58,7 @@ export const updateApiKeySchema = requestSchema({
       .regex(/^sk-/, 'OpenAI API keys start with "sk-"'),
   }),
 });
+
+export const deleteAccountSchema = requestSchema({
+  body: z.object({ password: z.string().min(1, "Enter your password to confirm") }),
+});

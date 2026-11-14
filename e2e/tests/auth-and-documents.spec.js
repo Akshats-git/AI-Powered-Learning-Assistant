@@ -48,7 +48,9 @@ test("uploads a PDF and sees it appear in the document list", async ({ page, req
   await expect(page).toHaveURL(/\/documents$/);
 
   const title = `E2E Document ${Date.now()}`;
-  await page.getByRole("button", { name: /upload document/i }).click();
+  // The empty state shows a second "Upload Document" button once the list has loaded, so
+  // whether one or two match depends on timing — .first() is the always-present header one.
+  await page.getByRole("button", { name: /upload document/i }).first().click();
   await page.getByLabel(/title/i).fill(title);
   await page.locator("#doc-file").setInputFiles(SAMPLE_PDF);
   await page.getByRole("button", { name: /^upload$/i }).click();

@@ -32,7 +32,7 @@ const VerifyEmailBanner = () => {
         type="button"
         onClick={handleResend}
         disabled={sending}
-        className="font-medium underline underline-offset-2 hover:no-underline disabled:opacity-60"
+        className="py-2.5 -my-2.5 font-medium underline underline-offset-2 hover:no-underline disabled:opacity-60"
       >
         {sending ? "Sending..." : "Resend verification email"}
       </button>
@@ -40,7 +40,7 @@ const VerifyEmailBanner = () => {
         type="button"
         onClick={() => setDismissed(true)}
         aria-label="Dismiss"
-        className="p-1 rounded hover:bg-amber-100"
+        className="p-2.5 -m-2 rounded hover:bg-amber-100"
       >
         <X className="w-4 h-4" />
       </button>

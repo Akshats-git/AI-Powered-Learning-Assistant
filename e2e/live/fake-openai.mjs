@@ -137,9 +137,11 @@ export const startFake = (port) => {
     }
 
     if (req.url.startsWith("/v1/chat/completions")) {
-      const prompt = body.messages?.map((m) => m.content).join("\n") || "";
+      // The standing rules travel as a system message; the task itself is what gets classified.
+      const prompt = body.messages?.filter((m) => m.role !== "system").map((m) => m.content).join("\n") || "";
+      const hasSystem = body.messages?.[0]?.role === "system";
       const kind = classify(prompt);
-      state.calls.push({ kind: "chat", feature: kind, model: body.model, key, json: body.response_format?.type === "json_object" });
+      state.calls.push({ kind: "chat", feature: kind, model: body.model, key, hasSystem, json: body.response_format?.type === "json_object" });
       const wait = state.delayMs[kind] || 0;
       if (wait) await new Promise((r) => setTimeout(r, wait));
       const fail = state.fail[kind];

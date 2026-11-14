@@ -288,6 +288,7 @@ try {
     r = await C.req("POST", "/api/ai/summary", { json: { documentId: docC._id } });
     check("summary -> 200 markdown", r.status === 200 && /Summary/.test(r.body.summary), r.text.slice(0, 120));
     r = await C.req("POST", "/api/ai/summary", { json: { documentId: docC._id } });
+    check("every chat-completion so far carried the system message (prompt-injection guard)", fake.count((c) => c.kind === "chat") > 0 && fake.count((c) => c.kind === "chat" && !c.hasSystem) === 0, `${fake.count((c) => c.kind === "chat" && !c.hasSystem)} without`);
     check("summary: 2nd identical request served from exact-hash cache (1 LLM call total)", r.status === 200 && fake.count((c) => c.feature === "summary") === 1, `${fake.count((c) => c.feature === "summary")}`);
     r = await C.req("POST", "/api/ai/explain", { json: { documentId: docC._id, concept: "Krebs cycle" } });
     check("explain -> 200 markdown", r.status === 200 && r.body.explanation, r.text.slice(0, 100));
@@ -530,9 +531,13 @@ try {
     const doc = (await R.upload("rl", pdf40)).body;
     let first429 = null;
     for (let i = 1; i <= 34; i += 1) {
-      const r = await R.req("GET", `/api/ai/chat-history/${doc._id}`);
+      // An invalid body is rejected with a 400 — but only after the limiter has counted it, which makes it a free probe.
+      const r = await R.req("POST", "/api/ai/explain", { json: {} });
       if (r.status === 429) { first429 = i; break; }
     }
+    // (GET chat-history is deliberately NOT limited: opening a document mustn't spend the AI budget.)
+    const hist = await R.req("GET", `/api/ai/chat-history/${doc._id}`);
+    check("chat history stays readable while the AI limiter is exhausted", hist.status === 200, `${hist.status}`);
     check("31st AI-router request in the window is 429", first429 !== null && first429 >= 30 && first429 <= 31, `first429 at request #${first429}`);
     check("other users are not throttled by R's usage (per-user key)", (await C.req("GET", `/api/ai/chat-history/${docC._id}`)).status === 200);
   }

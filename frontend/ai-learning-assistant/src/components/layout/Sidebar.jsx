@@ -52,7 +52,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             </div>
             <span className="font-semibold text-gray-900">StudyAI</span>
           </div>
-          <button onClick={onClose} className="lg:hidden text-gray-400 hover:text-gray-600" aria-label="Close menu">
+          <button onClick={onClose} className="lg:hidden p-2.5 -m-2.5 text-gray-400 hover:text-gray-600" aria-label="Close menu">
             <X className="w-5 h-5" />
           </button>
         </div>

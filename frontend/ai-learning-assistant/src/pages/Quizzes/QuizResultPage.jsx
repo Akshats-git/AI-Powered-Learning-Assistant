@@ -54,7 +54,7 @@ const QuizResultPage = () => {
   const passed = results.percentage >= 60;
 
   return (
-    <div>
+    <div className="mx-auto max-w-3xl">
       <div className="bg-white rounded-xl border border-gray-100 p-8 text-center mb-6">
         <div
           className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${

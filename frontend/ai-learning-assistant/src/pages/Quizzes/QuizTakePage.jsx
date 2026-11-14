@@ -58,7 +58,7 @@ const QuizTakePage = () => {
   };
 
   return (
-    <div>
+    <div className="mx-auto max-w-3xl">
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-lg font-bold text-gray-900 truncate">{quiz.title}</h1>
@@ -99,7 +99,7 @@ const QuizTakePage = () => {
           <button
             key={i}
             onClick={() => setIndex(i)}
-            className={`w-8 h-8 rounded-lg text-xs font-medium border transition ${
+            className={`w-10 h-10 rounded-lg text-xs font-medium border transition ${
               i === index
                 ? "border-primary text-primary-dark"
                 : answers[i] !== undefined

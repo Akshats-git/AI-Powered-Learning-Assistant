@@ -101,7 +101,7 @@ const FlashcardPage = () => {
     <div>
       <Link
         to={`/documents/${documentId}`}
-        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-4"
+        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 py-2 mb-2"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Document
@@ -119,7 +119,7 @@ const FlashcardPage = () => {
                 <button
                   key={format}
                   onClick={() => downloadFlashcardSet(set._id, format, set.title).catch(() => {})}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
                 >
                   <Download className="w-4 h-4" />
                   {label}
@@ -127,7 +127,7 @@ const FlashcardPage = () => {
               ))}
             <button
               onClick={() => setShowDelete(true)}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-600"
+              className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-red-500 hover:text-red-600"
             >
               <Trash2 className="w-4 h-4" />
               Delete Set

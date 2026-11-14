@@ -71,7 +71,7 @@ const FlashcardViewer = ({ cards, onReview, onToggleFavorite }) => {
               onToggleFavorite(card._id);
             }}
             aria-label="Toggle favorite"
-            className="text-gray-300 hover:text-amber-400"
+            className="p-2.5 -m-2.5 text-gray-300 hover:text-amber-400"
           >
             <Star className={`w-5 h-5 ${card.isFavorite ? "fill-amber-400 text-amber-400" : ""}`} />
           </button>

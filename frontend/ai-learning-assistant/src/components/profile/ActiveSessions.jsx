@@ -78,7 +78,7 @@ const ActiveSessions = () => {
               type="button"
               onClick={() => handleRevoke(session)}
               disabled={revokingId === session.familyId}
-              className="flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50 shrink-0"
+              className="flex items-center gap-1 py-2.5 -my-2.5 text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50 shrink-0"
             >
               <X className="w-3.5 h-3.5" />
               {session.isCurrent ? "Sign out" : "Revoke"}

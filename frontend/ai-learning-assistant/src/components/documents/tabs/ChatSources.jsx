@@ -48,7 +48,7 @@ const ChatSources = ({ sources, groundedness, onOpenPage }) => {
             type="button"
             onClick={() => setExpanded((prev) => !prev)}
             aria-expanded={expanded}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="flex items-center gap-1 py-2.5 -my-2.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
             <BookOpen className="w-3 h-3" />
             {sources.length} source{sources.length === 1 ? "" : "s"}

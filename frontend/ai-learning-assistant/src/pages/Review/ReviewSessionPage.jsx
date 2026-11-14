@@ -64,7 +64,7 @@ const ReviewSessionPage = () => {
 
   return (
     <div>
-      <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-4">
+      <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 py-2 mb-2">
         <ArrowLeft className="w-4 h-4" />
         Back to Dashboard
       </Link>

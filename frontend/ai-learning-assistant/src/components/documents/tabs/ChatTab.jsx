@@ -27,7 +27,8 @@ const ChatTab = ({ documentId, onOpenPage }) => {
   }, [documentId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    bottomRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
   }, [messages, sending]);
 
   const handleSend = async (e) => {
@@ -86,7 +87,7 @@ const ChatTab = ({ documentId, onOpenPage }) => {
           <button
             type="button"
             onClick={() => setConfirmingClear(true)}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-2.5 text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700"
           >
             <Eraser className="w-3.5 h-3.5" /> Clear chat
           </button>

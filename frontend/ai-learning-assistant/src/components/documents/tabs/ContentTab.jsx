@@ -66,7 +66,7 @@ const ContentTab = ({ document, page = null }) => {
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            className="inline-flex items-center gap-1.5 py-2.5 -my-2.5 text-xs font-medium text-primary hover:underline"
           >
             Open in new tab <ExternalLink className="w-3.5 h-3.5" />
           </a>

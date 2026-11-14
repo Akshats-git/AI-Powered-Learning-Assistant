@@ -16,7 +16,7 @@ const Navbar = ({ onMenuClick, onSearchClick }) => {
     <header className="h-16 flex items-center justify-between px-4 sm:px-6 border-b border-gray-100 bg-white">
       <button
         onClick={onMenuClick}
-        className="lg:hidden text-gray-500 hover:text-gray-700"
+        className="lg:hidden p-2.5 -m-2.5 text-gray-500 hover:text-gray-700"
         aria-label="Open menu"
       >
         <Menu className="w-5 h-5" />
@@ -28,7 +28,7 @@ const Navbar = ({ onMenuClick, onSearchClick }) => {
         <button
           onClick={onSearchClick}
           aria-label="Search"
-          className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 sm:rounded-lg sm:border sm:border-gray-200 sm:px-3 sm:py-1.5 sm:hover:bg-gray-50"
+          className="flex items-center gap-2 p-2.5 -m-2.5 sm:m-0 sm:p-0 text-sm text-gray-400 hover:text-gray-600 sm:rounded-lg sm:border sm:border-gray-200 sm:px-3 sm:py-1.5 sm:hover:bg-gray-50"
         >
           <Search className="w-5 h-5 sm:w-4 sm:h-4" />
           <span className="hidden sm:inline">Search</span>

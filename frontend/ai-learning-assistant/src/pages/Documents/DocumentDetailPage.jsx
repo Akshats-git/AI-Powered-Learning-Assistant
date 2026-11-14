@@ -60,7 +60,7 @@ const DocumentDetailPage = () => {
 
   return (
     <div>
-      <Link to="/documents" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-4">
+      <Link to="/documents" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 py-2 mb-2">
         <ArrowLeft className="w-4 h-4" />
         Back to Documents
       </Link>
@@ -113,7 +113,7 @@ const DocumentDetailPage = () => {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`pb-3 text-sm font-medium border-b-2 whitespace-nowrap transition ${
+            className={`min-w-11 pt-2.5 pb-3.5 text-center text-sm font-medium border-b-2 whitespace-nowrap transition ${
               activeTab === tab.key
                 ? "border-primary text-primary-dark"
                 : "border-transparent text-gray-500 hover:text-gray-700"

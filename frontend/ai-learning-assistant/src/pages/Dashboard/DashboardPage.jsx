@@ -7,6 +7,7 @@ import { getOverview } from "../../services/dashboardService";
 import { useAuth } from "../../hooks/useAuth";
 import WeakAreasPanel from "../../components/dashboard/WeakAreasPanel";
 import StreakBadge from "../../components/dashboard/StreakBadge";
+import DueTodayCard from "../../components/dashboard/DueTodayCard";
 
 const STAT_CARDS = [
   { key: "totalDocuments", label: "Total Documents", icon: FileText, tint: "bg-emerald-50 text-emerald-600" },
@@ -15,8 +16,8 @@ const STAT_CARDS = [
 ];
 
 const StatCardSkeleton = () => (
-  <div className="bg-white rounded-xl border border-gray-100 p-5 animate-pulse">
-    <div className="w-10 h-10 rounded-lg bg-gray-100 mb-4" />
+  <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-5 animate-pulse">
+    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-100 mb-3 sm:mb-4" />
     <div className="h-6 w-16 bg-gray-100 rounded mb-2" />
     <div className="h-3 w-24 bg-gray-100 rounded" />
   </div>
@@ -64,16 +65,19 @@ const DashboardPage = () => {
         <StreakBadge />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <DueTodayCard />
+
+      {/* Three across even on a phone: stacked, they filled the whole first screen. */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8">
         {loading
           ? STAT_CARDS.map((c) => <StatCardSkeleton key={c.key} />)
           : STAT_CARDS.map(({ key, label, icon: Icon, tint }) => (
-              <div key={key} className="bg-white rounded-xl border border-gray-100 p-5">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${tint}`}>
-                  <Icon className="w-5 h-5" />
+              <div key={key} className="bg-white rounded-xl border border-gray-100 p-3 sm:p-5">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mb-3 sm:mb-4 ${tint}`}>
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{overview?.[key] ?? 0}</p>
-                <p className="text-sm text-gray-500 mt-1">{label}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{overview?.[key] ?? 0}</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">{label}</p>
               </div>
             ))}
       </div>
@@ -112,7 +116,7 @@ const DashboardPage = () => {
                       <p className="text-xs text-gray-400">{timeAgo(activity.timestamp)}</p>
                     </div>
                   </div>
-                  <Link to={activity.link} className="text-xs font-medium text-primary hover:underline shrink-0 ml-3">
+                  <Link to={activity.link} className="py-2.5 -my-2.5 pl-3 text-xs font-medium text-primary hover:underline shrink-0">
                     View
                   </Link>
                 </li>
